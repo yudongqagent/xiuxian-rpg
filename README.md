@@ -18,6 +18,17 @@ npm run build      # 类型检查 + 生产构建 → dist/
   `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`）
 - 也可切换为 **GitHub Pages**：见 `.github/workflows/deploy.yml` 中注释部分
 
+## 文档索引（开发前必读顺序）
+
+| 文档 | 内容 |
+|---|---|
+| [docs/GDD.md](docs/GDD.md) | 游戏设计文档：玩法、境界、剧情、里程碑 |
+| [docs/DESIGN_PRINCIPLES.md](docs/DESIGN_PRINCIPLES.md) | 设计支柱与工程取舍准则、冲突裁决 |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 分层架构、数据流、事件总线契约、ADR |
+| [docs/CODING_GUIDELINES.md](docs/CODING_GUIDELINES.md) | TS/Vue/Phaser 编码规范、性能红线 |
+| [docs/CONTENT_AUTHORING.md](docs/CONTENT_AUTHORING.md) | content/ 数据创作指南与数值锚点 |
+| [docs/PROGRESS.md](docs/PROGRESS.md) | 开发进度与技术债清单 |
+
 ## 目录结构
 
 ```
