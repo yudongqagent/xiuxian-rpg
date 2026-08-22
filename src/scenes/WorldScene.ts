@@ -3,6 +3,7 @@ import { bus } from '../engine/eventBus'
 import { loadSave, writeSave } from '../engine/save'
 
 const TILE = 32
+const INTERACT_RANGE = 80
 /** 0=草地 1=小路 2=水 3=树 */
 const MAP: number[][] = Array.from({ length: 40 }, (_, y) =>
   Array.from({ length: 40 }, (_, x) => {
@@ -19,6 +20,10 @@ export class WorldScene extends Phaser.Scene {
   private joyVec = { x: 0, y: 0 }
   private keyState: () => { x: number; y: number } = () => ({ x: 0, y: 0 })
   private unsubs: Array<() => void> = []
+  private npcs: Array<{ id: string; sprite: Phaser.GameObjects.Image }> = []
+  private dialogueOpen = false
+  private interactKey!: Phaser.Input.Keyboard.Key
+  private prompt!: Phaser.GameObjects.Text
 
   constructor() {
     super('World')
@@ -56,7 +61,19 @@ export class WorldScene extends Phaser.Scene {
     )
 
     // 示例 NPC
-    this.physics.add.staticImage(21.5 * TILE, 14 * TILE, 'npc')
+    const moDafu = this.physics.add.staticImage(21.5 * TILE, 14 * TILE, 'npc')
+    moDafu.setInteractive({ useHandCursor: true })
+    moDafu.on('pointerdown', () => this.tryInteract())
+    this.npcs.push({ id: 'mo_dafu', sprite: moDafu })
+    this.prompt = this.add
+      .text(0, 0, '[E] 交谈', {
+        fontSize: '12px',
+        color: '#e8dcc0',
+        backgroundColor: '#1a120b',
+        padding: { x: 6, y: 3 },
+      })
+      .setOrigin(0.5)
+      .setVisible(false)
 
     // 玩家
     this.player = this.physics.add.sprite(20 * TILE, 28 * TILE, 'player')
@@ -69,12 +86,19 @@ export class WorldScene extends Phaser.Scene {
     this.unsubs.push(
       bus.on('joystick:move', (v) => (this.joyVec = v)),
       bus.on('joystick:end', () => (this.joyVec = { x: 0, y: 0 })),
+      bus.on('dialogue:open', () => {
+        this.dialogueOpen = true
+        this.joyVec = { x: 0, y: 0 }
+        this.prompt.setVisible(false)
+      }),
+      bus.on('dialogue:close', () => (this.dialogueOpen = false)),
     )
     const cursors = this.input.keyboard!.createCursorKeys()
     const wasd = this.input.keyboard!.addKeys('W,A,S,D') as Record<
       'W' | 'A' | 'S' | 'D',
       Phaser.Input.Keyboard.Key
     >
+    this.interactKey = this.input.keyboard!.addKey('E')
     this.keyState = () => ({
       x: (cursors.right.isDown || wasd.D.isDown ? 1 : 0) - (cursors.left.isDown || wasd.A.isDown ? 1 : 0),
       y: (cursors.down.isDown || wasd.S.isDown ? 1 : 0) - (cursors.up.isDown || wasd.W.isDown ? 1 : 0),
@@ -110,10 +134,40 @@ export class WorldScene extends Phaser.Scene {
   }
 
   update(): void {
+    if (this.dialogueOpen) {
+      this.player.setVelocity(0, 0)
+      return
+    }
+    const near = this.nearestNpc()
+    if (near) {
+      this.prompt.setPosition(near.sprite.x, near.sprite.y - TILE).setVisible(true)
+      if (Phaser.Input.Keyboard.JustDown(this.interactKey)) this.tryInteract()
+    } else {
+      this.prompt.setVisible(false)
+    }
     const speed = 160
     const k = this.keyState()
     const vx = (this.joyVec.x + k.x) * speed
     const vy = (this.joyVec.y + k.y) * speed
     this.player.setVelocity(Phaser.Math.Clamp(vx, -speed, speed), Phaser.Math.Clamp(vy, -speed, speed))
+  }
+
+  private nearestNpc(): { id: string; sprite: Phaser.GameObjects.Image } | null {
+    let best: { id: string; sprite: Phaser.GameObjects.Image } | null = null
+    let bestDist = INTERACT_RANGE
+    for (const npc of this.npcs) {
+      const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, npc.sprite.x, npc.sprite.y)
+      if (d < bestDist) {
+        bestDist = d
+        best = npc
+      }
+    }
+    return best
+  }
+
+  private tryInteract(): void {
+    const near = this.nearestNpc()
+    if (!near || this.dialogueOpen) return
+    bus.emit('dialogue:open', { npcId: near.id })
   }
 }

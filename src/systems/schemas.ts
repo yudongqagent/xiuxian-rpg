@@ -80,9 +80,33 @@ export const RegionSchema = z.object({
   adjacent: z.array(z.string()).default([]),
 })
 
+export const DialogueChoiceSchema = z.object({
+  text: z.string().min(1).max(60),
+  /** 目标节点 id；null 表示对话结束 */
+  next: z.string().nullable().default(null),
+})
+
+export const DialogueNodeSchema = z.object({
+  id: z.string().regex(/^[a-z0-9_]+$/),
+  speaker: z.string().min(1).max(20),
+  text: z.string().min(1).max(200),
+  /** 缺省或空数组 = 结束节点 */
+  choices: z.array(DialogueChoiceSchema).max(9).optional(),
+})
+
+export const DialogueSchema = z.object({
+  id: z.string().regex(/^[a-z0-9_]+$/),
+  npcId: z.string().regex(/^[a-z0-9_]+$/),
+  entry: z.string().min(1),
+  nodes: z.array(DialogueNodeSchema).min(1).max(50),
+})
+
 export type Item = z.infer<typeof ItemSchema>
 export type Skill = z.infer<typeof SkillSchema>
 export type ItemGradeValue = z.infer<typeof ItemGrade>
 export type GongfaGradeValue = z.infer<typeof GongfaGrade>
 export type Npc = z.infer<typeof NpcSchema>
 export type Region = z.infer<typeof RegionSchema>
+export type Dialogue = z.infer<typeof DialogueSchema>
+export type DialogueNode = z.infer<typeof DialogueNodeSchema>
+export type DialogueChoice = z.infer<typeof DialogueChoiceSchema>

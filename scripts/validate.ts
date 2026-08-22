@@ -6,7 +6,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { z } from 'zod'
-import { ItemSchema, SkillSchema, NpcSchema, RegionSchema } from '../src/systems/schemas'
+import { ItemSchema, SkillSchema, NpcSchema, RegionSchema, DialogueSchema } from '../src/systems/schemas'
 
 const ROOT = join(import.meta.dirname, '..', 'content')
 
@@ -32,8 +32,10 @@ check('物品', ItemSchema, 'items')
 check('功法', SkillSchema, 'skills')
 check('人物', NpcSchema, 'npcs')
 check('区域', RegionSchema, 'world')
+check('对话', DialogueSchema, 'dialogues')
 
 const regionIds = new Set(readAll('world').map((r) => String(r['id'])))
+const npcIds = new Set(readAll('npcs').map((n) => String(n['id'])))
 
 function checkRefs() {
   for (const npc of readAll('npcs')) {
@@ -49,6 +51,32 @@ function checkRefs() {
       if (!regionIds.has(adj)) {
         errors++
         console.error(`✗ [引用] 区域 ${String(region['id'])} 的相邻区域 "${adj}" 不存在`)
+      }
+    }
+  }
+  for (const dialogue of readAll('dialogues')) {
+    const dlgId = String(dialogue['id'])
+    if (!npcIds.has(String(dialogue['npcId']))) {
+      errors++
+      console.error(`✗ [引用] 对话 ${dlgId} 的 npcId "${String(dialogue['npcId'])}" 不存在`)
+    }
+    const nodes = new Set(
+      (Array.isArray(dialogue['nodes']) ? dialogue['nodes'] : []).map((n) => String((n as { id: string }).id)),
+    )
+    const entry = String(dialogue['entry'])
+    if (!nodes.has(entry)) {
+      errors++
+      console.error(`✗ [引用] 对话 ${dlgId} 的入口节点 "${entry}" 不存在`)
+    }
+    for (const node of Array.isArray(dialogue['nodes']) ? dialogue['nodes'] : []) {
+      const choices = Array.isArray((node as { choices?: unknown[] }).choices)
+        ? ((node as { choices: unknown[] }).choices as Array<{ next?: string | null }>)
+        : []
+      for (const c of choices) {
+        if (c.next !== null && c.next !== undefined && !nodes.has(c.next)) {
+          errors++
+          console.error(`✗ [引用] 对话 ${dlgId} 节点 "${String((node as { id: string }).id)}" 的选项目标 "${c.next}" 不存在`)
+        }
       }
     }
   }
