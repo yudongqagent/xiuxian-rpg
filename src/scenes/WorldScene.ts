@@ -3,7 +3,16 @@ import { bus } from '../engine/eventBus'
 import { loadSave, writeSave } from '../engine/save'
 
 const TILE = 32
+const PLAYER_SPEED = 160
+const ENEMY_SPEED = 40
+const ENEMY_WANDER_INTERVAL = 2000
 const INTERACT_RANGE = 80
+const SPAWN = { x: 20 * TILE, y: 28 * TILE }
+const ENEMY_SPAWNS = [
+  { x: 16 * TILE, y: 12 * TILE },
+  { x: 24 * TILE, y: 18 * TILE },
+]
+const ENEMY_ID = 'hui_lang'
 /** 0=草地 1=小路 2=水 3=树 */
 const MAP: number[][] = Array.from({ length: 40 }, (_, y) =>
   Array.from({ length: 40 }, (_, x) => {
@@ -17,6 +26,9 @@ const MAP: number[][] = Array.from({ length: 40 }, (_, y) =>
 
 export class WorldScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite
+  private wolves!: Phaser.Physics.Arcade.Group
+  private activeEnemy: Phaser.Physics.Arcade.Sprite | undefined
+  private battleActive = false
   private joyVec = { x: 0, y: 0 }
   private keyState: () => { x: number; y: number } = () => ({ x: 0, y: 0 })
   private unsubs: Array<() => void> = []
@@ -76,11 +88,40 @@ export class WorldScene extends Phaser.Scene {
       .setVisible(false)
 
     // 玩家
-    this.player = this.physics.add.sprite(20 * TILE, 28 * TILE, 'player')
+    this.player = this.physics.add.sprite(SPAWN.x, SPAWN.y, 'player')
     this.player.setCollideWorldBounds(true)
     this.physics.add.collider(this.player, obstacles)
     this.cameras.main.startFollow(this.player, true, 0.15, 0.15)
     this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels)
+
+    // 妖兽游荡 + 接触触发战斗
+    this.wolves = this.physics.add.group()
+    ENEMY_SPAWNS.forEach(({ x, y }) => {
+      const wolf = this.wolves.create(x, y, 'wolf') as Phaser.Physics.Arcade.Sprite
+      wolf.setCollideWorldBounds(true)
+      this.time.addEvent({
+        delay: ENEMY_WANDER_INTERVAL,
+        loop: true,
+        callback: () => {
+          if (this.battleActive) return
+          wolf.setVelocity(
+            Phaser.Math.Between(-1, 1) * ENEMY_SPEED,
+            Phaser.Math.Between(-1, 1) * ENEMY_SPEED,
+          )
+        },
+      })
+    })
+    this.physics.add.collider(this.wolves, obstacles)
+    this.physics.add.collider(this.player, this.wolves)
+    this.physics.add.overlap(this.player, this.wolves, (_p, wolfObj) => {
+      const wolf = wolfObj as Phaser.Physics.Arcade.Sprite
+      if (this.battleActive || !wolf.body) return
+      this.activeEnemy = wolf
+      this.battleActive = true
+      this.player.setVelocity(0, 0)
+      this.joyVec = { x: 0, y: 0 }
+      bus.emit('battle:start', { enemyId: ENEMY_ID })
+    })
 
     // 摇杆输入 + 键盘备用
     this.unsubs.push(
@@ -92,6 +133,17 @@ export class WorldScene extends Phaser.Scene {
         this.prompt.setVisible(false)
       }),
       bus.on('dialogue:close', () => (this.dialogueOpen = false)),
+      bus.on('battle:start', () => (this.battleActive = true)),
+      bus.on('battle:end', ({ win }) => {
+        this.battleActive = false
+        if (win) {
+          this.activeEnemy?.destroy()
+        } else {
+          this.player.setPosition(SPAWN.x, SPAWN.y)
+          this.joyVec = { x: 0, y: 0 }
+        }
+        this.activeEnemy = undefined
+      }),
     )
     const cursors = this.input.keyboard!.createCursorKeys()
     const wasd = this.input.keyboard!.addKeys('W,A,S,D') as Record<
@@ -134,7 +186,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   update(): void {
-    if (this.dialogueOpen) {
+    if (this.dialogueOpen || this.battleActive) {
       this.player.setVelocity(0, 0)
       return
     }
@@ -145,11 +197,10 @@ export class WorldScene extends Phaser.Scene {
     } else {
       this.prompt.setVisible(false)
     }
-    const speed = 160
     const k = this.keyState()
-    const vx = (this.joyVec.x + k.x) * speed
-    const vy = (this.joyVec.y + k.y) * speed
-    this.player.setVelocity(Phaser.Math.Clamp(vx, -speed, speed), Phaser.Math.Clamp(vy, -speed, speed))
+    const vx = (this.joyVec.x + k.x) * PLAYER_SPEED
+    const vy = (this.joyVec.y + k.y) * PLAYER_SPEED
+    this.player.setVelocity(Phaser.Math.Clamp(vx, -PLAYER_SPEED, PLAYER_SPEED), Phaser.Math.Clamp(vy, -PLAYER_SPEED, PLAYER_SPEED))
   }
 
   private nearestNpc(): { id: string; sprite: Phaser.GameObjects.Image } | null {

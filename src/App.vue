@@ -4,6 +4,7 @@ import Hud from './ui/Hud.vue'
 import Joystick from './ui/Joystick.vue'
 import InventoryPanel from './ui/InventoryPanel.vue'
 import DialogueBox from './ui/DialogueBox.vue'
+import BattlePanel from './ui/BattlePanel.vue'
 import { createGame } from './engine/game'
 
 const gameHost = ref<HTMLElement | null>(null)
@@ -23,6 +24,7 @@ onUnmounted(() => game?.destroy(true))
     <Joystick />
     <InventoryPanel v-if="showInv" @close="showInv = false" />
     <DialogueBox />
+    <BattlePanel />
   </div>
 </template>
 

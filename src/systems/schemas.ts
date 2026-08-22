@@ -101,7 +101,20 @@ export const DialogueSchema = z.object({
   nodes: z.array(DialogueNodeSchema).min(1).max(50),
 })
 
+export const EnemySchema = z.object({
+  id: z.string().regex(/^[a-z0-9_]+$/),
+  name: z.string().min(1).max(20),
+  description: z.string().max(200),
+  stats: z.object({
+    hp: z.number().int().min(1),
+    atk: z.number().int().min(0),
+    def: z.number().int().min(0),
+    speed: z.number().int().min(0).max(99),
+  }),
+})
+
 export type Item = z.infer<typeof ItemSchema>
+export type Enemy = z.infer<typeof EnemySchema>
 export type Skill = z.infer<typeof SkillSchema>
 export type ItemGradeValue = z.infer<typeof ItemGrade>
 export type GongfaGradeValue = z.infer<typeof GongfaGrade>

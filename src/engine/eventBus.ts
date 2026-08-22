@@ -9,6 +9,12 @@ type GameEvents = {
   'player:position': { x: number; y: number }
   'dialogue:open': { npcId: string }
   'dialogue:close': void
+  /** 世界层触发遭遇，enemyId 对应 content/enemies/<id>.json */
+  'battle:start': { enemyId: string }
+  /** UI 层玩家指令 */
+  'battle:action': 'attack' | 'skill' | 'flee'
+  /** 战斗收尾：win=胜利；false 含战败与逃跑 */
+  'battle:end': { win: boolean }
 }
 
 /** Vue UI 与 Phaser 世界之间唯一通信通道 */

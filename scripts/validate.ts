@@ -6,7 +6,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { z } from 'zod'
-import { ItemSchema, SkillSchema, NpcSchema, RegionSchema, DialogueSchema } from '../src/systems/schemas'
+import { ItemSchema, SkillSchema, NpcSchema, RegionSchema, DialogueSchema, EnemySchema } from '../src/systems/schemas'
 
 const ROOT = join(import.meta.dirname, '..', 'content')
 
@@ -33,6 +33,7 @@ check('功法', SkillSchema, 'skills')
 check('人物', NpcSchema, 'npcs')
 check('区域', RegionSchema, 'world')
 check('对话', DialogueSchema, 'dialogues')
+check('妖兽', EnemySchema, 'enemies')
 
 const regionIds = new Set(readAll('world').map((r) => String(r['id'])))
 const npcIds = new Set(readAll('npcs').map((n) => String(n['id'])))
