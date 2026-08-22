@@ -23,15 +23,15 @@ jobs:
       - run: npm run validate   # zod 内容校验，不合格数据直接拦截
       - run: npm run build
 
-      # 方案 A：GitHub Pages（零配置，取消下面注释即可）
-      # - uses: actions/upload-pages-artifact@v3
-      #   with:
-      #     path: dist
-      # - uses: actions/deploy-pages@v4
-
-      # 方案 B：Cloudflare Pages（国内访问更快，需在仓库 Secrets 配置以下三项）
-      - uses: cloudflare/wrangler-action@v3
+      # GitHub Pages（零配置，push 即发布）
+      - uses: actions/upload-pages-artifact@v3
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=xiuxian-rpg
+          path: dist
+      - uses: actions/deploy-pages@v4
+
+      # Cloudflare Pages 备选（国内访问更快，需配置仓库 Secrets 后启用）
+      # - uses: cloudflare/wrangler-action@v3
+      #   with:
+      #     apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      #     accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      #     command: pages deploy dist --project-name=xiuxian-rpg
