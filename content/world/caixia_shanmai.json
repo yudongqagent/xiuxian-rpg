@@ -1,0 +1,7 @@
+{
+  "id": "caixia_shanmai",
+  "name": "彩霞山脉",
+  "description": "七玄门所倚的连绵群山，朝暮时分霞光映石，故名彩霞。山中野兽成群、草药遍地，近来更有野狼帮的眼线出没林间，猎户樵夫皆不敢深入。",
+  "levelBand": "凡人~炼气",
+  "adjacent": ["qixuan_men", "luoyun_fangshi"]
+}
