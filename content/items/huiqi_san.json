@@ -1,0 +1,9 @@
+{
+  "id": "huiqi_san",
+  "name": "回气散",
+  "type": "consumable",
+  "grade": "凡品",
+  "description": "以七叶灵草研磨制成的散药，服之可缓缓恢复灵气，练气期修士的常备之物。",
+  "stats": {},
+  "effect": { "qi": 30 }
+}

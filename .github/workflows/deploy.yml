@@ -1,0 +1,37 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run validate   # zod 内容校验，不合格数据直接拦截
+      - run: npm run build
+
+      # 方案 A：GitHub Pages（零配置，取消下面注释即可）
+      # - uses: actions/upload-pages-artifact@v3
+      #   with:
+      #     path: dist
+      # - uses: actions/deploy-pages@v4
+
+      # 方案 B：Cloudflare Pages（国内访问更快，需在仓库 Secrets 配置以下三项）
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=xiuxian-rpg

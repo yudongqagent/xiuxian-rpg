@@ -1,0 +1,8 @@
+{
+  "id": "qingyun_jian",
+  "name": "青云剑",
+  "type": "weapon",
+  "grade": "法器",
+  "description": "黄枫谷外门弟子制式法剑，剑身刻有青云纹，注入灵力可放出三尺青芒。",
+  "stats": { "atk": 45 }
+}

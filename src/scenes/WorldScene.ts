@@ -1,0 +1,119 @@
+import Phaser from 'phaser'
+import { bus } from '../engine/eventBus'
+import { loadSave, writeSave } from '../engine/save'
+
+const TILE = 32
+/** 0=草地 1=小路 2=水 3=树 */
+const MAP: number[][] = Array.from({ length: 40 }, (_, y) =>
+  Array.from({ length: 40 }, (_, x) => {
+    if (y === 0 || x === 0 || y >= 38 || x >= 38) return 2
+    if (Math.abs(x - 20) < 2 && Math.abs(y - 20) < 14) return 1
+    if ((x * 7 + y * 13) % 23 === 0) return 3
+    if (x > 30 && y < 10 && (x + y) % 17 === 0) return 3
+    return 0
+  }),
+)
+
+export class WorldScene extends Phaser.Scene {
+  private player!: Phaser.Physics.Arcade.Sprite
+  private joyVec = { x: 0, y: 0 }
+  private keyState: () => { x: number; y: number } = () => ({ x: 0, y: 0 })
+  private unsubs: Array<() => void> = []
+
+  constructor() {
+    super('World')
+  }
+
+  create(): void {
+    const map = this.make.tilemap({
+      tileWidth: TILE,
+      tileHeight: TILE,
+      width: MAP[0].length,
+      height: MAP.length,
+    })
+    // 用生成的贴图拼一张 3 帧图集：草、路、水
+    const atlas = this.textures.createCanvas('tiles', TILE * 3, TILE)!
+    atlas.drawFrame('tile-grass', undefined, 0, 0)
+    atlas.drawFrame('tile-path', undefined, TILE, 0)
+    atlas.drawFrame('tile-water', undefined, TILE * 2, 0)
+    atlas.refresh()
+    const tiles = map.addTilesetImage('tiles', 'tiles', TILE, TILE, 0, 0)!
+    const layer = map.createLayer(0, tiles, 0, 0)!
+    MAP.forEach((row, y) => row.forEach((t, x) => layer.putTileAt(t === 3 ? 0 : t, x, y)))
+
+    // 障碍层（树）
+    const obstacles = this.physics.add.staticGroup()
+    MAP.forEach((row, y) =>
+      row.forEach((t, x) => {
+        if (t !== 3) return
+        layer.putTileAt(0, x, y)
+        obstacles
+          .create(x * TILE + TILE / 2, y * TILE + TILE / 2, 'tree')
+          ?.setSize(TILE, TILE)
+          .setOffset(0, -8)
+          .refreshBody()
+      }),
+    )
+
+    // 示例 NPC
+    this.physics.add.staticImage(21.5 * TILE, 14 * TILE, 'npc')
+
+    // 玩家
+    this.player = this.physics.add.sprite(20 * TILE, 28 * TILE, 'player')
+    this.player.setCollideWorldBounds(true)
+    this.physics.add.collider(this.player, obstacles)
+    this.cameras.main.startFollow(this.player, true, 0.15, 0.15)
+    this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels)
+
+    // 摇杆输入 + 键盘备用
+    this.unsubs.push(
+      bus.on('joystick:move', (v) => (this.joyVec = v)),
+      bus.on('joystick:end', () => (this.joyVec = { x: 0, y: 0 })),
+    )
+    const cursors = this.input.keyboard!.createCursorKeys()
+    const wasd = this.input.keyboard!.addKeys('W,A,S,D') as Record<
+      'W' | 'A' | 'S' | 'D',
+      Phaser.Input.Keyboard.Key
+    >
+    this.keyState = () => ({
+      x: (cursors.right.isDown || wasd.D.isDown ? 1 : 0) - (cursors.left.isDown || wasd.A.isDown ? 1 : 0),
+      y: (cursors.down.isDown || wasd.S.isDown ? 1 : 0) - (cursors.up.isDown || wasd.W.isDown ? 1 : 0),
+    })
+
+    // 存档恢复 + 自动保存
+    void loadSave().then((save) => {
+      if (save) this.player.setPosition(save.x, save.y)
+      this.time.addEvent({
+        delay: 5000,
+        loop: true,
+        callback: () =>
+          void writeSave({
+            version: 1,
+            playerId: 'mortal-001',
+            x: this.player.x,
+            y: this.player.y,
+            inventory: [],
+            savedAt: Date.now(),
+          }),
+      })
+    })
+
+    // 上报坐标给 HUD
+    this.time.addEvent({
+      delay: 250,
+      loop: true,
+      callback: () =>
+        bus.emit('player:position', { x: this.player.x, y: this.player.y }),
+    })
+
+    this.events.on('shutdown', () => this.unsubs.forEach((u) => u()))
+  }
+
+  update(): void {
+    const speed = 160
+    const k = this.keyState()
+    const vx = (this.joyVec.x + k.x) * speed
+    const vy = (this.joyVec.y + k.y) * speed
+    this.player.setVelocity(Phaser.Math.Clamp(vx, -speed, speed), Phaser.Math.Clamp(vy, -speed, speed))
+  }
+}
