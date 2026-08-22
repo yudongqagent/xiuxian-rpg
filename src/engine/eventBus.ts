@@ -7,6 +7,8 @@ type GameEvents = {
   'ui:toggle-inventory': void
   'inventory:changed': string[]
   'player:position': { x: number; y: number }
+  'dialogue:open': { npcId: string }
+  'dialogue:close': void
 }
 
 /** Vue UI 与 Phaser 世界之间唯一通信通道 */
