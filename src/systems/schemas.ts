@@ -70,7 +70,20 @@ export const RegionSchema = z.object({
   adjacent: z.array(z.string()).default([]),
 })
 
+export const EnemySchema = z.object({
+  id: z.string().regex(/^[a-z0-9_]+$/),
+  name: z.string().min(1).max(20),
+  description: z.string().max(200),
+  stats: z.object({
+    hp: z.number().int().min(1),
+    atk: z.number().int().min(0),
+    def: z.number().int().min(0),
+    speed: z.number().int().min(0).max(99),
+  }),
+})
+
 export type Item = z.infer<typeof ItemSchema>
+export type Enemy = z.infer<typeof EnemySchema>
 export type Skill = z.infer<typeof SkillSchema>
 export type Npc = z.infer<typeof NpcSchema>
 export type Region = z.infer<typeof RegionSchema>

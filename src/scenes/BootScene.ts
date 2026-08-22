@@ -50,6 +50,14 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(0xc98ad4).fillCircle(10, 10, 8)
     g.generateTexture('npc', 20, 20)
 
+    // 妖兽（狼）
+    g.clear()
+    g.fillStyle(0x6e6e78).fillCircle(11, 11, 9)
+    g.fillStyle(0x8a8a96).fillTriangle(4, 5, 8, 1, 10, 6)
+    g.fillTriangle(14, 5, 18, 1, 18, 6)
+    g.fillStyle(0xd94f3d).fillCircle(8, 10, 2)
+    g.generateTexture('wolf', 22, 22)
+
     g.destroy()
     this.scene.start('World')
   }
