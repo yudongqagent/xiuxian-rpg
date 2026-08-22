@@ -1,6 +1,14 @@
 import Phaser from 'phaser'
 import { bus } from '../engine/eventBus'
 import { loadSave, writeSave } from '../engine/save'
+import {
+  fromPlayerSave,
+  getPlayer,
+  respawnPenalty,
+  setPlayer,
+  toPlayerSave,
+  updatePlayer,
+} from '../systems/player'
 
 const TILE = 32
 const PLAYER_SPEED = 160
@@ -8,11 +16,16 @@ const ENEMY_SPEED = 40
 const ENEMY_WANDER_INTERVAL = 2000
 const INTERACT_RANGE = 80
 const SPAWN = { x: 20 * TILE, y: 28 * TILE }
-const ENEMY_SPAWNS = [
-  { x: 16 * TILE, y: 12 * TILE },
-  { x: 24 * TILE, y: 18 * TILE },
+const SAVE_VERSION = 2
+// ==== combat-depth: 敌人出生点布线（仅改此段，避免与其他 agent 冲突） ====
+const COMBAT_ENEMY_SPAWNS = [
+  { x: 16 * TILE, y: 12 * TILE, id: 'hui_lang', tint: 0xffffff },
+  { x: 24 * TILE, y: 18 * TILE, id: 'hui_lang', tint: 0xffffff },
+  { x: 12 * TILE, y: 22 * TILE, id: 'shan_xiao', tint: 0x9fd08a },
+  { x: 28 * TILE, y: 24 * TILE, id: 'du_zhu', tint: 0xc07ad9 },
+  { x: 32 * TILE, y: 6 * TILE, id: 'ye_zhu_wang', tint: 0xe06a4a, scale: 1.6 },
 ]
-const ENEMY_ID = 'hui_lang'
+// ==== end combat-depth ====
 /** 0=草地 1=小路 2=水 3=树 */
 const MAP: number[][] = Array.from({ length: 40 }, (_, y) =>
   Array.from({ length: 40 }, (_, x) => {
@@ -95,9 +108,13 @@ export class WorldScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels)
 
     // 妖兽游荡 + 接触触发战斗
+    // ==== combat-depth: 多妖兽出生（id 存于 sprite data，战斗时上报对应模板） ====
     this.wolves = this.physics.add.group()
-    ENEMY_SPAWNS.forEach(({ x, y }) => {
+    COMBAT_ENEMY_SPAWNS.forEach(({ x, y, id, tint, scale }) => {
       const wolf = this.wolves.create(x, y, 'wolf') as Phaser.Physics.Arcade.Sprite
+      wolf.setData('enemyId', id)
+      if (tint !== 0xffffff) wolf.setTint(tint)
+      if (scale) wolf.setScale(scale).refreshBody()
       wolf.setCollideWorldBounds(true)
       this.time.addEvent({
         delay: ENEMY_WANDER_INTERVAL,
@@ -120,8 +137,9 @@ export class WorldScene extends Phaser.Scene {
       this.battleActive = true
       this.player.setVelocity(0, 0)
       this.joyVec = { x: 0, y: 0 }
-      bus.emit('battle:start', { enemyId: ENEMY_ID })
+      bus.emit('battle:start', { enemyId: String(wolf.getData('enemyId')) })
     })
+    // ==== end combat-depth ====
 
     // 摇杆输入 + 键盘备用
     this.unsubs.push(
@@ -134,11 +152,14 @@ export class WorldScene extends Phaser.Scene {
       }),
       bus.on('dialogue:close', () => (this.dialogueOpen = false)),
       bus.on('battle:start', () => (this.battleActive = true)),
-      bus.on('battle:end', ({ win }) => {
+      bus.on('battle:end', ({ win, fled }) => {
         this.battleActive = false
         if (win) {
           this.activeEnemy?.destroy()
-        } else {
+        } else if (!fled) {
+          // 战败（非逃跑）：宽惩罚——气血折半，送回出生点
+          updatePlayer(respawnPenalty)
+          bus.emit('player:stats')
           this.player.setPosition(SPAWN.x, SPAWN.y)
           this.joyVec = { x: 0, y: 0 }
         }
@@ -158,18 +179,25 @@ export class WorldScene extends Phaser.Scene {
 
     // 存档恢复 + 自动保存
     void loadSave().then((save) => {
-      if (save) this.player.setPosition(save.x, save.y)
+      if (save) {
+        this.player.setPosition(save.x, save.y)
+        // ==== combat-depth: 恢复成长/背包/功法（旧档无 player 字段则全新开局） ====
+        setPlayer(fromPlayerSave(save.player))
+        bus.emit('player:stats')
+        // ==== end combat-depth ====
+      }
       this.time.addEvent({
         delay: 5000,
         loop: true,
         callback: () =>
           void writeSave({
-            version: 1,
+            version: SAVE_VERSION,
             playerId: 'mortal-001',
             x: this.player.x,
             y: this.player.y,
             inventory: [],
             savedAt: Date.now(),
+            player: toPlayerSave(getPlayer()),
           }),
       })
     })

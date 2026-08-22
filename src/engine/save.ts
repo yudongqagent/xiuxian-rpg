@@ -13,6 +13,16 @@ function openDb(): Promise<IDBDatabase> {
   })
 }
 
+export interface PlayerSave {
+  level: number
+  exp: number
+  hp: number
+  qi: number
+  /** itemId → 数量 */
+  inventory: Record<string, number>
+  skills: string[]
+}
+
 export interface SaveData {
   version: number
   playerId: string
@@ -20,6 +30,8 @@ export interface SaveData {
   y: number
   inventory: string[]
   savedAt: number
+  /** v2 起携带成长/背包/功法；旧档缺省时按全新炼气一层处理（向后兼容） */
+  player?: PlayerSave
 }
 
 export async function loadSave(): Promise<SaveData | null> {

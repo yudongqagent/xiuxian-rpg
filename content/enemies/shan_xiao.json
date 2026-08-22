@@ -1,0 +1,8 @@
+{
+  "id": "shan_xiao",
+  "name": "山魈",
+  "description": "深山中独行的魈怪，身形瘦长、纵跃如飞。爪子虽不甚重，出手快得让人反应不及。",
+  "stats": { "hp": 22, "atk": 7, "def": 1, "speed": 9 },
+  "exp": 14,
+  "loot": [{ "item": "yaodan", "chance": 0.25 }]
+}

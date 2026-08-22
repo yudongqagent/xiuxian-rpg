@@ -14,7 +14,11 @@ type GameEvents = {
   /** UI 层玩家指令 */
   'battle:action': 'attack' | 'skill' | 'flee'
   /** 战斗收尾：win=胜利；false 含战败与逃跑 */
-  'battle:end': { win: boolean }
+  'battle:end': { win: boolean; fled?: boolean }
+  /** 拾取/掉落入库，UI 弹提示 */
+  'item:acquired': { itemId: string; count: number }
+  /** 玩家成长状态变化（等级/经验/血灵），HUD 重读 store */
+  'player:stats': void
 }
 
 /** Vue UI 与 Phaser 世界之间唯一通信通道 */

@@ -118,6 +118,13 @@ function checkRefs() {
       if (!itemIds.has(it)) refErr(`任务 ${qid}`, '奖励物品', it)
     }
   }
+  for (const enemy of readAll('enemies')) {
+    const eid = String(enemy['id'])
+    const loot = Array.isArray(enemy['loot']) ? (enemy['loot'] as Array<{ item?: string }>) : []
+    for (const entry of loot) {
+      if (entry.item && !itemIds.has(entry.item)) refErr(`妖兽 ${eid}`, '掉落物品', entry.item)
+    }
+  }
   console.log('✓ 引用完整性校验通过')
 }
 if (errors === 0) checkRefs()

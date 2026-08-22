@@ -1,0 +1,169 @@
+/**
+ * 玩家成长与背包状态。纯函数负责推导/变换，末尾附带极小的可订阅存储，
+ * 供 UI 层跨组件共享；持久化由调用方经 save.ts 完成。
+ * 数值曲线锚定 GDD §10：炼气一层 攻 10。
+ */
+import { PLAYER_BASE_STATS } from './combat'
+import type { PlayerSave } from '../engine/save'
+
+export interface PlayerState {
+  level: number
+  exp: number
+  hp: number
+  qi: number
+  inventory: Record<string, number>
+  skills: string[]
+}
+
+export const STARTING_SKILLS = ['huodan_shu'] as const
+export const STARTING_INVENTORY: Record<string, number> = { huiqi_san: 3, huichun_san: 2 }
+
+const EXP_BASE = 30
+const EXP_STEP = 20
+const LEVEL_RESTORE_RATIO = 0.4
+const MAX_LEVEL = 99
+
+export function statsForLevel(level: number): {
+  maxHp: number
+  maxQi: number
+  atk: number
+  def: number
+  speed: number
+} {
+  const l = level - 1
+  return {
+    maxHp: PLAYER_BASE_STATS.maxHp + l * 12,
+    maxQi: PLAYER_BASE_STATS.maxQi + l * 8,
+    atk: PLAYER_BASE_STATS.atk + l * 3,
+    def: PLAYER_BASE_STATS.def + Math.floor(l * 0.7),
+    speed: PLAYER_BASE_STATS.speed + Math.floor(l / 2),
+  }
+}
+
+export function expToNext(level: number): number {
+  return EXP_BASE + (level - 1) * EXP_STEP
+}
+
+const REALM_NUMERALS = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二', '十三']
+const REALM_MAX_LAYER = REALM_NUMERALS.length
+
+export function realmLabel(level: number): string {
+  if (level >= REALM_MAX_LAYER) return `炼气${REALM_NUMERALS[REALM_MAX_LAYER - 1]}层·圆满`
+  return `炼气${REALM_NUMERALS[level - 1]}层`
+}
+
+export function createPlayer(): PlayerState {
+  const s = statsForLevel(1)
+  return {
+    level: 1,
+    exp: 0,
+    hp: s.maxHp,
+    qi: s.maxQi,
+    inventory: { ...STARTING_INVENTORY },
+    skills: [...STARTING_SKILLS],
+  }
+}
+
+function restoreRatio(p: PlayerState): PlayerState {
+  const s = statsForLevel(p.level)
+  return {
+    ...p,
+    hp: Math.min(s.maxHp, p.hp + Math.ceil(s.maxHp * LEVEL_RESTORE_RATIO)),
+    qi: Math.min(s.maxQi, p.qi + Math.ceil(s.maxQi * LEVEL_RESTORE_RATIO)),
+  }
+}
+
+/** 结算经验并连升多级；每级回复部分气血/灵气，剩余经验滚入下一级 */
+export function grantExp(p: PlayerState, amount: number): { player: PlayerState; levelsGained: number } {
+  let next: PlayerState = { ...p, inventory: { ...p.inventory }, skills: [...p.skills] }
+  next.exp += amount
+  let gained = 0
+  while (next.level < MAX_LEVEL && next.exp >= expToNext(next.level)) {
+    next.exp -= expToNext(next.level)
+    next.level += 1
+    gained += 1
+    next = restoreRatio(next)
+  }
+  return { player: next, levelsGained: gained }
+}
+
+export function addItem(p: PlayerState, itemId: string, count = 1): PlayerState {
+  return {
+    ...p,
+    inventory: { ...p.inventory, [itemId]: (p.inventory[itemId] ?? 0) + count },
+  }
+}
+
+export function removeItem(p: PlayerState, itemId: string, count = 1): PlayerState {
+  const have = p.inventory[itemId] ?? 0
+  if (have < count) return p
+  const inv = { ...p.inventory }
+  if (inv[itemId] === count) delete inv[itemId]
+  else inv[itemId] = have - count
+  return { ...p, inventory: inv }
+}
+
+/** 战败惩罚（宽）：重伤回出生点，气血折半、灵气保留 */
+export function respawnPenalty(p: PlayerState): PlayerState {
+  const s = statsForLevel(p.level)
+  return { ...p, hp: Math.ceil(s.maxHp / 2) }
+}
+
+/** 战斗结束后把战斗内的血/灵写回持久状态 */
+export function syncAfterBattle(p: PlayerState, hp: number, qi: number): PlayerState {
+  const s = statsForLevel(p.level)
+  return { ...p, hp: clampInt(hp, 0, s.maxHp), qi: clampInt(qi, 0, s.maxQi) }
+}
+
+function clampInt(v: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, Math.round(v)))
+}
+
+export function toPlayerSave(p: PlayerState): PlayerSave {
+  return {
+    level: p.level,
+    exp: p.exp,
+    hp: p.hp,
+    qi: p.qi,
+    inventory: { ...p.inventory },
+    skills: [...p.skills],
+  }
+}
+
+/** 旧档缺 player 字段时按全新炼气一层处理；字段逐一兜底，向后兼容 */
+export function fromPlayerSave(s: PlayerSave | undefined): PlayerState {
+  const fresh = createPlayer()
+  if (!s) return fresh
+  const level = clampInt(s.level ?? fresh.level, 1, MAX_LEVEL)
+  const stats = statsForLevel(level)
+  return {
+    level,
+    exp: Math.max(0, s.exp ?? 0),
+    hp: clampInt(s.hp ?? stats.maxHp, 0, stats.maxHp),
+    qi: clampInt(s.qi ?? stats.maxQi, 0, stats.maxQi),
+    inventory: { ...fresh.inventory, ...(s.inventory ?? {}) },
+    skills: Array.from(new Set([...fresh.skills, ...(s.skills ?? [])])),
+  }
+}
+
+type Listener = () => void
+const listeners = new Set<Listener>()
+let current: PlayerState = createPlayer()
+
+export function getPlayer(): PlayerState {
+  return current
+}
+
+export function setPlayer(next: PlayerState): void {
+  current = next
+  listeners.forEach((fn) => fn())
+}
+
+export function updatePlayer(fn: (p: PlayerState) => PlayerState): void {
+  setPlayer(fn(current))
+}
+
+export function subscribePlayer(fn: Listener): () => void {
+  listeners.add(fn)
+  return () => listeners.delete(fn)
+}

@@ -1,18 +1,37 @@
 <script setup lang="ts">
-import { onUnmounted, ref } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import { bus } from '../engine/eventBus'
+import {
+  expToNext,
+  getPlayer,
+  realmLabel,
+  statsForLevel,
+  subscribePlayer,
+} from '../systems/player'
 
 const pos = ref({ x: 0, y: 0 })
-const un = bus.on('player:position', (p) => (pos.value = p))
-onUnmounted(un)
+const player = ref(getPlayer())
+const unPos = bus.on('player:position', (p) => (pos.value = p))
+const unStats = subscribePlayer(() => (player.value = getPlayer()))
+onUnmounted(() => {
+  unPos()
+  unStats()
+})
+
+const stats = computed(() => statsForLevel(player.value.level))
+
+function pctOf(v: number, max: number): string {
+  return `${Math.min(100, Math.round((v / max) * 100))}%`
+}
 </script>
 
 <template>
   <div class="hud">
     <div class="realm">
-      <span class="name">凡人 · 张铁柱</span>
-      <div class="bar"><i style="width: 32%" /></div>
-      <span class="hint">炼气一层 32/100 灵气</span>
+      <span class="name">凡人 · {{ realmLabel(player.level) }}</span>
+      <div class="bar"><i class="exp" :style="{ width: pctOf(player.exp, expToNext(player.level)) }" /></div>
+      <span class="hint">血 {{ player.hp }}/{{ stats.maxHp }} · 灵 {{ player.qi }}/{{ stats.maxQi }} · 修为
+        {{ player.exp }}/{{ expToNext(player.level) }}</span>
     </div>
     <button class="btn" @click="$emit('open-inventory')">背包</button>
     <div class="coords">{{ Math.round(pos.x / 32) }},{{ Math.round(pos.y / 32) }}</div>
@@ -45,6 +64,8 @@ onUnmounted(un)
 .bar i {
   display: block;
   height: 100%;
+}
+.bar .exp {
   background: linear-gradient(90deg, #7ec8a9, #cfe8b5);
 }
 .btn {

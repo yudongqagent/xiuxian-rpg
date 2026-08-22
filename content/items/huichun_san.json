@@ -1,0 +1,9 @@
+{
+  "id": "huichun_san",
+  "name": "回春散",
+  "type": "consumable",
+  "grade": "凡品",
+  "description": "以七叶灵草配伍三七研末制成的伤药，外敷内服皆可，最能止血生肌。行走荒野的修士，囊中总得备上几包。",
+  "stats": {},
+  "effect": { "hp": 30 }
+}
