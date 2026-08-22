@@ -38,7 +38,7 @@ export class WorldScene extends Phaser.Scene {
     atlas.drawFrame('tile-water', undefined, TILE * 2, 0)
     atlas.refresh()
     const tiles = map.addTilesetImage('tiles', 'tiles', TILE, TILE, 0, 0)!
-    const layer = map.createLayer(0, tiles, 0, 0)!
+    const layer = map.createBlankLayer('ground', tiles, 0, 0)!
     MAP.forEach((row, y) => row.forEach((t, x) => layer.putTileAt(t === 3 ? 0 : t, x, y)))
 
     // 障碍层（树）
