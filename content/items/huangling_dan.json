@@ -1,0 +1,9 @@
+{
+  "id": "huangling_dan",
+  "name": "黄龙丹",
+  "type": "consumable",
+  "grade": "灵器",
+  "description": "筑基修士常用的培元丹药，丹成时隐有黄龙纹路盘绕。药力浑厚绵长，服下一粒，斗法耗损的灵力半日便可回复七八成。",
+  "stats": {},
+  "effect": { "qi": 200 }
+}

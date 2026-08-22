@@ -1,0 +1,14 @@
+{
+  "id": "qm_08_yuanfu_luanxinghai",
+  "name": "第八章·远赴乱星海",
+  "type": "main",
+  "giver": "xinggong_shengzhu",
+  "prerequisites": { "realm": "结丹后期", "quests": ["qm_07_zhiyou_zhi_shang"] },
+  "steps": [
+    { "kind": "reach", "region": "luanxing_hai" },
+    { "kind": "kill", "target": "haiyuan_shou", "count": 2 },
+    { "kind": "collect", "target": "haishou_neidan", "count": 2 },
+    { "kind": "talk", "npc": "yuan_yao" }
+  ],
+  "rewards": { "lingshi": 5000, "items": ["yinshen_fu"], "exp_qi": 40000 }
+}

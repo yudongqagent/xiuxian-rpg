@@ -1,0 +1,13 @@
+{
+  "id": "qm_03_baiyaoyuan",
+  "name": "第三章·百药园杂役",
+  "type": "main",
+  "giver": "ma_guanshi",
+  "prerequisites": { "realm": "炼气4层", "quests": ["qm_02_duoshen"] },
+  "steps": [
+    { "kind": "reach", "region": "huangfeng_gu" },
+    { "kind": "talk", "npc": "li_huayuan" },
+    { "kind": "collect", "target": "qi_xie_ling_cao", "count": 10 }
+  ],
+  "rewards": { "lingshi": 200, "items": ["ju_qi_san"], "exp_qi": 500 }
+}

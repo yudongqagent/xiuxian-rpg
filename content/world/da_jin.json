@@ -1,0 +1,7 @@
+{
+  "id": "da_jin",
+  "name": "大晋",
+  "description": "人界北方第一大国，修仙界传承之悠久冠绝天下，古修遗迹、上古禁地遍地皆是。国中大派林立、神通辈出，规矩也最深——外来修士若不懂拜山头的礼数，寸步难行。",
+  "levelBand": "元婴后期~化神",
+  "adjacent": ["yuanwu_guo", "tianxing_cheng", "dujie_feng"]
+}

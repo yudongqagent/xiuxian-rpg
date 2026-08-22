@@ -1,0 +1,7 @@
+{
+  "id": "tianxing_cheng",
+  "name": "天星城",
+  "description": "乱星海内海的枢纽巨城，传说是上古修士以移山之法悬于海面而建。星宫在此开坊市、设传送阵，天下奇珍云集。城规第一条：城中动手者，杀无赦。",
+  "levelBand": "元婴",
+  "adjacent": ["luanxing_hai", "da_jin"]
+}

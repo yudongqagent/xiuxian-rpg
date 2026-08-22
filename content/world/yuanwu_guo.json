@@ -1,0 +1,7 @@
+{
+  "id": "yuanwu_guo",
+  "name": "元武国",
+  "description": "天南第一大国，疆域十倍于越国，境内大宗林立、坊市繁盛。修仙界有言：不到元武国，不知天南之大。国中灵山福地多被大派占据，散修只能在夹缝里讨生活。",
+  "levelBand": "结丹",
+  "adjacent": ["tainan_shan", "huangfeng_gu", "luoyun_zong", "da_jin"]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "qm_04_xuese_shilian",
+  "name": "第四章·血色试炼",
+  "type": "main",
+  "giver": "li_huayuan",
+  "prerequisites": { "realm": "炼气圆满", "quests": ["qm_03_baiyaoyuan"] },
+  "steps": [
+    { "kind": "reach", "region": "xuese_shilian_ta" },
+    { "kind": "kill", "target": "shilian_zhe", "count": 3 },
+    { "kind": "collect", "target": "xue_lingzhi", "count": 2 },
+    { "kind": "talk", "npc": "dong_xuaner" }
+  ],
+  "rewards": { "lingshi": 500, "items": ["zhu_ji_dan"], "exp_qi": 2000 }
+}

@@ -3,5 +3,5 @@
   "name": "落云坊市",
   "description": "散修在太岳山脉南麓自发聚起的交易集市，鱼龙混杂。明面上摆着符箓丹药，暗地里禁物灵药也有价码。声望高者可讨折扣，生人前来则须谨防宰客与黑手。",
   "levelBand": "炼气~筑基",
-  "adjacent": ["caixia_shanmai", "taiyue_shanmai"]
+  "adjacent": ["caixia_shanmai", "taiyue_shanmai", "tainan_shan"]
 }

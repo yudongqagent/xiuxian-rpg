@@ -1,0 +1,13 @@
+{
+  "id": "qm_05_zhengmo_zhanyi",
+  "name": "第五章·正魔之战",
+  "type": "main",
+  "giver": "li_huayuan",
+  "prerequisites": { "realm": "筑基初期", "quests": ["qm_04_xuese_shilian"] },
+  "steps": [
+    { "kind": "reach", "region": "yuejiang_zhanchang" },
+    { "kind": "kill", "target": "modao_dizi", "count": 8 },
+    { "kind": "talk", "npc": "chen_qiaoqian" }
+  ],
+  "rewards": { "lingshi": 1000, "items": ["huangling_dan"], "exp_qi": 5000 }
+}

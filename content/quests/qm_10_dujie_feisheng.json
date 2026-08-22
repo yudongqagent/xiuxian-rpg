@@ -1,0 +1,13 @@
+{
+  "id": "qm_10_dujie_feisheng",
+  "name": "第十章·渡劫飞升",
+  "type": "main",
+  "giver": "nangong_wan",
+  "prerequisites": { "realm": "化神", "quests": ["qm_09_xiaoping_zhenxiang"] },
+  "steps": [
+    { "kind": "reach", "region": "dujie_feng" },
+    { "kind": "kill", "target": "xinmo", "count": 1 },
+    { "kind": "talk", "npc": "nangong_wan" }
+  ],
+  "rewards": { "lingshi": 50000, "items": ["san_yan_shan"], "exp_qi": 200000 }
+}

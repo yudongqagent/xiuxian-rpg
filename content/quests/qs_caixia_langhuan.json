@@ -1,0 +1,12 @@
+{
+  "id": "qs_caixia_langhuan",
+  "name": "彩霞山的狼患",
+  "type": "side",
+  "giver": "li_feiyu",
+  "prerequisites": { "realm": "炼气1层" },
+  "steps": [
+    { "kind": "kill", "target": "hui_lang", "count": 5 },
+    { "kind": "talk", "npc": "chaopeng_laoren" }
+  ],
+  "rewards": { "lingshi": 50, "items": ["huiqi_san"], "exp_qi": 100 }
+}

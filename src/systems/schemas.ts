@@ -113,6 +113,53 @@ export const EnemySchema = z.object({
   }),
 })
 
+export const QuestStepSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('kill'),
+    /** 敌人 id（content/enemies） */
+    target: z.string(),
+    count: z.number().int().min(1),
+  }),
+  z.object({
+    kind: z.literal('talk'),
+    /** NPC id（content/npcs） */
+    npc: z.string(),
+  }),
+  z.object({
+    kind: z.literal('collect'),
+    /** 物品 id（content/items） */
+    target: z.string(),
+    count: z.number().int().min(1),
+  }),
+  z.object({
+    kind: z.literal('reach'),
+    /** 区域 id（content/world） */
+    region: z.string(),
+  }),
+])
+
+export const QuestSchema = z.object({
+  id: z.string().regex(/^[a-z0-9_]+$/),
+  name: z.string().min(1).max(40),
+  type: z.enum(['main', 'side', 'daily', 'hidden']),
+  /** 发布任务的 NPC id */
+  giver: z.string(),
+  prerequisites: z
+    .object({
+      realm: z.string().optional(),
+      quests: z.array(z.string()).default([]),
+    })
+    .default({}),
+  steps: z.array(QuestStepSchema).min(1).max(12),
+  rewards: z
+    .object({
+      lingshi: z.number().int().min(0).default(0),
+      items: z.array(z.string()).default([]),
+      exp_qi: z.number().int().min(0).default(0),
+    })
+    .default({}),
+})
+
 export type Item = z.infer<typeof ItemSchema>
 export type Enemy = z.infer<typeof EnemySchema>
 export type Skill = z.infer<typeof SkillSchema>
@@ -123,3 +170,5 @@ export type Region = z.infer<typeof RegionSchema>
 export type Dialogue = z.infer<typeof DialogueSchema>
 export type DialogueNode = z.infer<typeof DialogueNodeSchema>
 export type DialogueChoice = z.infer<typeof DialogueChoiceSchema>
+export type Quest = z.infer<typeof QuestSchema>
+export type QuestStep = z.infer<typeof QuestStepSchema>

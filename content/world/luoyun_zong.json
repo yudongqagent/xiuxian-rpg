@@ -1,0 +1,7 @@
+{
+  "id": "luoyun_zong",
+  "name": "落云宗",
+  "description": "元武国数得着的大宗门，山门云海翻涌、殿宇凌空。宗内女修尤多，戒律却比别家森严。结丹长老坐镇，寻常筑基修士连山门都近不得。",
+  "levelBand": "结丹~元婴",
+  "adjacent": ["yuanwu_guo"]
+}

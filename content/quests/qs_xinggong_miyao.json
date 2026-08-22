@@ -1,0 +1,12 @@
+{
+  "id": "qs_xinggong_miyao",
+  "name": "星宫密药",
+  "type": "daily",
+  "giver": "xinggong_shengzhu",
+  "prerequisites": { "realm": "元婴初期" },
+  "steps": [
+    { "kind": "collect", "target": "haishou_neidan", "count": 2 },
+    { "kind": "talk", "npc": "xinggong_shengzhu" }
+  ],
+  "rewards": { "lingshi": 2000, "items": ["huangling_dan"], "exp_qi": 5000 }
+}

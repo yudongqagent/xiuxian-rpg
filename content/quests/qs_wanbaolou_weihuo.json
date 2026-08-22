@@ -1,0 +1,12 @@
+{
+  "id": "qs_wanbaolou_weihuo",
+  "name": "万宝楼的委托",
+  "type": "hidden",
+  "giver": "wanbaolou_zhanggui",
+  "prerequisites": { "realm": "炼气7层" },
+  "steps": [
+    { "kind": "collect", "target": "bai_nian_ling_zhi", "count": 1 },
+    { "kind": "talk", "npc": "wanbaolou_zhanggui" }
+  ],
+  "rewards": { "lingshi": 400, "items": ["yinshen_fu"], "exp_qi": 600 }
+}

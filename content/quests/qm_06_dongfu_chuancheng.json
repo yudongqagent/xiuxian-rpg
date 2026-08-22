@@ -1,0 +1,13 @@
+{
+  "id": "qm_06_dongfu_chuancheng",
+  "name": "第六章·洞府传承",
+  "type": "main",
+  "giver": "nangong_wan",
+  "prerequisites": { "realm": "筑基圆满", "quests": ["qm_05_zhengmo_zhanyi"] },
+  "steps": [
+    { "kind": "reach", "region": "shanggu_dongfu" },
+    { "kind": "kill", "target": "yanjia_xi", "count": 2 },
+    { "kind": "collect", "target": "qiannian_lingru", "count": 1 }
+  ],
+  "rewards": { "lingshi": 2000, "items": ["huangling_dan"], "exp_qi": 12000 }
+}

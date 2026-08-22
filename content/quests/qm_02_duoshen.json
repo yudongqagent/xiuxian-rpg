@@ -1,0 +1,13 @@
+{
+  "id": "qm_02_duoshen",
+  "name": "第二章·夺舍之变",
+  "type": "main",
+  "giver": "mo_caihuan",
+  "prerequisites": { "realm": "炼气3层", "quests": ["qm_01_rumen"] },
+  "steps": [
+    { "kind": "kill", "target": "yelang_bangzhong", "count": 5 },
+    { "kind": "talk", "npc": "li_feiyu" },
+    { "kind": "reach", "region": "caixia_shanmai" }
+  ],
+  "rewards": { "lingshi": 100, "items": ["ju_qi_san"], "exp_qi": 300 }
+}

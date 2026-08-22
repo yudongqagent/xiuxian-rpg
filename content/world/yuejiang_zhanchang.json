@@ -1,0 +1,7 @@
+{
+  "id": "yuejiang_zhanchang",
+  "name": "越疆战场",
+  "description": "魔道六宗大举入侵后，越国边境沦为焦土。残破的城墙下尸骨枕藉，正道联军与魔道修士在此反复拉锯。战况惨烈，却也是低阶修士搏军功、捡战利品的凶险之地。",
+  "levelBand": "筑基",
+  "adjacent": ["huangfeng_gu", "shanggu_dongfu"]
+}

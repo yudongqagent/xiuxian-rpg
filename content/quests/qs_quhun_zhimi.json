@@ -1,0 +1,12 @@
+{
+  "id": "qs_quhun_zhimi",
+  "name": "曲魂之谜",
+  "type": "hidden",
+  "giver": "mo_caihuan",
+  "prerequisites": { "realm": "炼气6层" },
+  "steps": [
+    { "kind": "talk", "npc": "qu_hun" },
+    { "kind": "talk", "npc": "mo_caihuan" }
+  ],
+  "rewards": { "lingshi": 150, "items": ["xi_sui_dan"], "exp_qi": 600 }
+}

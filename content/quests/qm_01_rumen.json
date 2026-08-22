@@ -1,0 +1,13 @@
+{
+  "id": "qm_01_rumen",
+  "name": "第一章·神手谷拜师",
+  "type": "main",
+  "giver": "mo_dafu",
+  "prerequisites": {},
+  "steps": [
+    { "kind": "talk", "npc": "yue_tangzhu" },
+    { "kind": "collect", "target": "qi_xie_ling_cao", "count": 5 },
+    { "kind": "talk", "npc": "mo_dafu" }
+  ],
+  "rewards": { "lingshi": 20, "items": ["tie_jian"], "exp_qi": 50 }
+}

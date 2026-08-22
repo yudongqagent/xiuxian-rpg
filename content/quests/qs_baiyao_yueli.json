@@ -1,0 +1,12 @@
+{
+  "id": "qs_baiyao_yueli",
+  "name": "百药园月例",
+  "type": "daily",
+  "giver": "ma_guanshi",
+  "prerequisites": {},
+  "steps": [
+    { "kind": "collect", "target": "qi_xie_ling_cao", "count": 10 },
+    { "kind": "talk", "npc": "ma_guanshi" }
+  ],
+  "rewards": { "lingshi": 80, "items": ["huiqi_san"], "exp_qi": 150 }
+}

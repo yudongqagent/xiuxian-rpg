@@ -1,0 +1,13 @@
+{
+  "id": "qm_07_zhiyou_zhi_shang",
+  "name": "第七章·挚友之殇",
+  "type": "main",
+  "giver": "qu_hun",
+  "prerequisites": { "realm": "结丹初期", "quests": ["qm_06_dongfu_chuancheng"] },
+  "steps": [
+    { "kind": "talk", "npc": "qu_hun" },
+    { "kind": "reach", "region": "luoyun_zong" },
+    { "kind": "talk", "npc": "nangong_wan" }
+  ],
+  "rewards": { "lingshi": 3000, "exp_qi": 20000 }
+}

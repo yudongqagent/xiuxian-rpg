@@ -1,0 +1,7 @@
+{
+  "id": "luanxing_hai",
+  "name": "乱星海",
+  "description": "天南之外的茫茫海域，岛屿如繁星散落，故名乱星海。外海妖兽横行，高阶海兽翻覆楼船只在顷刻间；内海则由星宫立法定规。此地灵药矿藏远胜内陆，是元婴修士的淘金场，也是葬身地。",
+  "levelBand": "元婴",
+  "adjacent": ["yuanwu_guo", "tianxing_cheng"]
+}

@@ -1,0 +1,13 @@
+{
+  "id": "qm_09_xiaoping_zhenxiang",
+  "name": "第九章·小瓶真相",
+  "type": "main",
+  "giver": "yuan_yao",
+  "prerequisites": { "realm": "元婴中期", "quests": ["qm_08_yuanfu_luanxinghai"] },
+  "steps": [
+    { "kind": "reach", "region": "da_jin" },
+    { "kind": "kill", "target": "gumo_canpo", "count": 1 },
+    { "kind": "collect", "target": "tianlei_zhu", "count": 1 }
+  ],
+  "rewards": { "lingshi": 8000, "items": ["qingzhu_fengyun_jian"], "exp_qi": 80000 }
+}

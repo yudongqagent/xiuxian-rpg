@@ -1,0 +1,7 @@
+{
+  "id": "shanggu_dongfu",
+  "name": "上古洞府",
+  "description": "战火轰塌山壁后现出的一座上古修士洞府，禁制大半失效，内里丹房、静室、藏宝阁俱全。消息走漏后，各路修士蜂拥而至——洞府传承只归一人，来晚的只能捡残羹。",
+  "levelBand": "筑基圆满",
+  "adjacent": ["yuejiang_zhanchang"]
+}

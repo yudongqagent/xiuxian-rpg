@@ -6,7 +6,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { z } from 'zod'
-import { ItemSchema, SkillSchema, NpcSchema, RegionSchema, DialogueSchema, EnemySchema } from '../src/systems/schemas'
+import { ItemSchema, SkillSchema, NpcSchema, RegionSchema, DialogueSchema, EnemySchema, QuestSchema } from '../src/systems/schemas'
 
 const ROOT = join(import.meta.dirname, '..', 'content')
 
@@ -34,9 +34,18 @@ check('人物', NpcSchema, 'npcs')
 check('区域', RegionSchema, 'world')
 check('对话', DialogueSchema, 'dialogues')
 check('妖兽', EnemySchema, 'enemies')
+check('任务', QuestSchema, 'quests')
 
 const regionIds = new Set(readAll('world').map((r) => String(r['id'])))
 const npcIds = new Set(readAll('npcs').map((n) => String(n['id'])))
+const itemIds = new Set(readAll('items').map((i) => String(i['id'])))
+const enemyIds = new Set(readAll('enemies').map((e) => String(e['id'])))
+const questIds = new Set(readAll('quests').map((q) => String(q['id'])))
+
+function refErr(owner: string, label: string, id: string) {
+  errors++
+  console.error(`✗ [引用] ${owner} 的${label} "${id}" 不存在`)
+}
 
 function checkRefs() {
   for (const npc of readAll('npcs')) {
@@ -79,6 +88,34 @@ function checkRefs() {
           console.error(`✗ [引用] 对话 ${dlgId} 节点 "${String((node as { id: string }).id)}" 的选项目标 "${c.next}" 不存在`)
         }
       }
+    }
+  }
+  for (const quest of readAll('quests')) {
+    const qid = String(quest['id'])
+    const type = String(quest['type'])
+    if (type === 'main' && !qid.startsWith('qm_')) {
+      errors++
+      console.error(`✗ [规范] 主线任务 ${qid} 的 id 必须以 qm_ 开头`)
+    }
+    if (type !== 'main' && qid.startsWith('qm_')) {
+      errors++
+      console.error(`✗ [规范] 非主线任务 ${qid} 不应使用 qm_ 前缀`)
+    }
+    if (!npcIds.has(String(quest['giver']))) refErr(`任务 ${qid}`, '发布人', String(quest['giver']))
+    for (const dep of (quest['prerequisites'] as { quests?: string[] })?.quests ?? []) {
+      if (!questIds.has(dep)) refErr(`任务 ${qid}`, '前置任务', dep)
+    }
+    const steps = Array.isArray(quest['steps']) ? quest['steps'] : []
+    for (const step of steps) {
+      const s = step as { kind: string; target?: string; npc?: string; region?: string }
+      if (s.kind === 'kill' && s.target && !enemyIds.has(s.target)) refErr(`任务 ${qid}`, '击杀目标', s.target)
+      if (s.kind === 'talk' && s.npc && !npcIds.has(s.npc)) refErr(`任务 ${qid}`, '对话 NPC', s.npc)
+      if (s.kind === 'collect' && s.target && !itemIds.has(s.target)) refErr(`任务 ${qid}`, '收集物品', s.target)
+      if (s.kind === 'reach' && s.region && !regionIds.has(s.region)) refErr(`任务 ${qid}`, '目标区域', s.region)
+    }
+    const rewardItems = (quest['rewards'] as { items?: string[] })?.items ?? []
+    for (const it of rewardItems) {
+      if (!itemIds.has(it)) refErr(`任务 ${qid}`, '奖励物品', it)
     }
   }
   console.log('✓ 引用完整性校验通过')
