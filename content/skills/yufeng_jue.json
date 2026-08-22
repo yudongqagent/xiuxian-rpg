@@ -2,7 +2,12 @@
   "id": "yufeng_jue",
   "name": "御风诀",
   "kind": "心法",
-  "grade": "法器",
-  "realms": [{ "realm": "炼气", "layers": 6 }],
+  "grade": "黄品",
+  "realms": [
+    {
+      "realm": "炼气",
+      "layers": 6
+    }
+  ],
   "description": "炼气期吐纳御风之法，引灵气游走四肢百骸。行功时自觉身轻如叶、耳畔风鸣渐起，久练之后疾行如奔马，纵跃高墙亦不费吹灰之力。"
 }

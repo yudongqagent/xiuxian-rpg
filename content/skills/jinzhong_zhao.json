@@ -2,7 +2,12 @@
   "id": "jinzhong_zhao",
   "name": "金钟罩",
   "kind": "炼体",
-  "grade": "法器",
-  "realms": [{ "realm": "炼气", "layers": 4 }],
+  "grade": "黄品",
+  "realms": [
+    {
+      "realm": "炼气",
+      "layers": 4
+    }
+  ],
   "description": "以灵气淬体的护身硬功，运功时周身泛起淡金光晕，如覆巨钟。防御之强冠绝同阶，只是每用必耗气血，贪功久练者，根基反受其损。"
 }
