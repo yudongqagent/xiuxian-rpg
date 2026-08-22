@@ -1,9 +1,13 @@
 {
   "id": "changchun_gong",
   "name": "长春功",
-  "type": "心法",
   "kind": "心法",
   "grade": "凡品",
-  "realms": [{ "realm": "炼气", "layers": 13 }],
+  "realms": [
+    {
+      "realm": "炼气",
+      "layers": 13
+    }
+  ],
   "description": "墨大夫所授的基础吐纳法门，进境虽缓却胜在中正平和，是无数散修踏入仙途的第一步。"
 }

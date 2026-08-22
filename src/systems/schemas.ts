@@ -2,7 +2,8 @@ import { z } from 'zod'
 
 /** 所有 content/ 下数据的契约。AI 生成新内容必须符合 schema，CI 自动校验。 */
 
-export const Grade = z.enum([
+/** 器物品阶（GDD §4.2 装备与炼器，数值锚点见 CONTENT_AUTHORING §6） */
+export const ItemGrade = z.enum([
   '凡品',
   '法器',
   '灵器',
@@ -11,11 +12,20 @@ export const Grade = z.enum([
   '仙器',
 ])
 
+/** 功法品阶（GDD §4.1：凡品 < 黄品 < 玄品 < 地品 < 天品） */
+export const GongfaGrade = z.enum([
+  '凡品',
+  '黄品',
+  '玄品',
+  '地品',
+  '天品',
+])
+
 export const ItemSchema = z.object({
   id: z.string().regex(/^[a-z0-9_]+$/),
   name: z.string().min(1).max(20),
   type: z.enum(['weapon', 'armor', 'consumable', 'material']),
-  grade: Grade,
+  grade: ItemGrade,
   description: z.string().max(200),
   /** 战斗属性加成 */
   stats: z
@@ -40,7 +50,7 @@ export const SkillSchema = z.object({
   id: z.string().regex(/^[a-z0-9_]+$/),
   name: z.string().min(1).max(20),
   kind: z.enum(['心法', '剑诀', '身法', '炼体', '神通']),
-  grade: Grade,
+  grade: GongfaGrade,
   /** 各境界可修炼层数 */
   realms: z.array(
     z.object({
@@ -72,5 +82,7 @@ export const RegionSchema = z.object({
 
 export type Item = z.infer<typeof ItemSchema>
 export type Skill = z.infer<typeof SkillSchema>
+export type ItemGradeValue = z.infer<typeof ItemGrade>
+export type GongfaGradeValue = z.infer<typeof GongfaGrade>
 export type Npc = z.infer<typeof NpcSchema>
 export type Region = z.infer<typeof RegionSchema>
