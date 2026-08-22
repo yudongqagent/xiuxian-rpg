@@ -1,0 +1,7 @@
+{
+  "id": "taiyue_shanmai",
+  "name": "太岳山脉",
+  "description": "横亘越国腹地的莽莽大山，峰高林密，筑基级妖兽踞谷为王，山腹间偶有灵矿脉露头。散修结伙入山采药采矿，十人进山，归来常不过三四。",
+  "levelBand": "筑基",
+  "adjacent": ["huangfeng_gu", "luoyun_fangshi", "xuese_shilian_ta"]
+}

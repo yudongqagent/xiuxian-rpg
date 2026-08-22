@@ -60,6 +60,17 @@ export const NpcSchema = z.object({
   dialogues: z.array(z.string()).min(1),
 })
 
+export const RegionSchema = z.object({
+  id: z.string().regex(/^[a-z0-9_]+$/),
+  name: z.string().min(1).max(20),
+  description: z.string().max(200),
+  /** 建议进入的境界带，如 "凡人~炼气" */
+  levelBand: z.string().min(1).max(20),
+  /** 相邻区域 id 列表（双向对称） */
+  adjacent: z.array(z.string()).default([]),
+})
+
 export type Item = z.infer<typeof ItemSchema>
 export type Skill = z.infer<typeof SkillSchema>
 export type Npc = z.infer<typeof NpcSchema>
+export type Region = z.infer<typeof RegionSchema>

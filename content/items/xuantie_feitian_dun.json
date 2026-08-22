@@ -1,0 +1,8 @@
+{
+  "id": "xuantie_feitian_dun",
+  "name": "玄铁飞天盾",
+  "type": "armor",
+  "grade": "法器",
+  "description": "以玄铁混入精金炼成的小盾，注入灵力便悬空护主，随敌势左右游走。分量沉得离谱，好在用起来靠的是灵力，不是臂力。",
+  "stats": { "def": 45 }
+}
