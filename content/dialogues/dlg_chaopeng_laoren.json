@@ -1,0 +1,21 @@
+{
+  "id": "dlg_chaopeng_laoren",
+  "npcId": "chaopeng_laoren",
+  "entry": "greet",
+  "nodes": [
+    {
+      "id": "greet",
+      "speaker": "炒彭老人",
+      "text": "（山道旁的老者守着一口铁锅，香气四溢）后生，讨碗热汤喝么？这彩霞山的野菌，配上山泉水，神仙来了也不换。",
+      "choices": [
+        { "text": "多谢老丈。这条山道通向何处？", "next": "road" },
+        { "text": "老人家保重，在下赶路。", "next": null }
+      ]
+    },
+    {
+      "id": "road",
+      "speaker": "炒彭老人",
+      "text": "往北回七玄门村子，往东穿过这道岭，便是密林妖谷喽。（他搅着锅，慢悠悠地）谷里雾气重，有蟒。老朽劝你，没点本事莫进去。"
+    }
+  ]
+}

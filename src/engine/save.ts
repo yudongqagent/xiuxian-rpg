@@ -18,6 +18,8 @@ export interface SaveData {
   playerId: string
   x: number
   y: number
+  /** 当前地图 id；旧存档缺省时由消费方回退到默认地图 */
+  mapId?: string
   inventory: string[]
   savedAt: number
 }

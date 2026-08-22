@@ -15,6 +15,8 @@ type GameEvents = {
   'battle:action': 'attack' | 'skill' | 'flee'
   /** 战斗收尾：win=胜利；false 含战败与逃跑 */
   'battle:end': { win: boolean }
+  /** 进入新地图，UI 层展示区域名横幅 */
+  'area:enter': { name: string }
 }
 
 /** Vue UI 与 Phaser 世界之间唯一通信通道 */

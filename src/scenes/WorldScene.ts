@@ -1,28 +1,29 @@
 import Phaser from 'phaser'
 import { bus } from '../engine/eventBus'
 import { loadSave, writeSave } from '../engine/save'
+import { DEFAULT_MAP_ID, getGameMap, isWalkable } from '../systems/maps'
+import type { GameMap } from '../systems/schemas'
+
+type PortalTarget = GameMap['portals'][number]['to']
+import { FRAME, HOUSE_KEY, MAP_ATLAS_KEY, buildMapTileTextures } from './mapTiles'
 
 const TILE = 32
 const PLAYER_SPEED = 160
 const ENEMY_SPEED = 40
 const ENEMY_WANDER_INTERVAL = 2000
 const INTERACT_RANGE = 80
-const SPAWN = { x: 20 * TILE, y: 28 * TILE }
-const ENEMY_SPAWNS = [
-  { x: 16 * TILE, y: 12 * TILE },
-  { x: 24 * TILE, y: 18 * TILE },
-]
-const ENEMY_ID = 'hui_lang'
-/** 0=草地 1=小路 2=水 3=树 */
-const MAP: number[][] = Array.from({ length: 40 }, (_, y) =>
-  Array.from({ length: 40 }, (_, x) => {
-    if (y === 0 || x === 0 || y >= 38 || x >= 38) return 2
-    if (Math.abs(x - 20) < 2 && Math.abs(y - 20) < 14) return 1
-    if ((x * 7 + y * 13) % 23 === 0) return 3
-    if (x > 30 && y < 10 && (x + y) % 17 === 0) return 3
-    return 0
-  }),
-)
+const FADE_MS = 350
+
+// ===================================================================
+// 多地图系统（world-maps 分支）：地图来自 content/maps/*.json DSL，
+// 场景跳转经 portal 触发 scene.restart 携带落点。战斗/对话逻辑不变。
+// ===================================================================
+
+interface SceneRoute {
+  mapId?: string
+  x?: number
+  y?: number
+}
 
 export class WorldScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite
@@ -37,46 +38,44 @@ export class WorldScene extends Phaser.Scene {
   private interactKey!: Phaser.Input.Keyboard.Key
   private prompt!: Phaser.GameObjects.Text
 
+  private mapId = DEFAULT_MAP_ID
+  private gameMap!: GameMap
+  private spawnPoint = { x: 0, y: 0 }
+  private portalZones: Array<{ zone: Phaser.GameObjects.Zone; to: PortalTarget }> = []
+  private obstacles!: Phaser.Physics.Arcade.StaticGroup
+  private ready = false
+  private transitioning = false
+
   constructor() {
     super('World')
   }
 
   create(): void {
-    const map = this.make.tilemap({
-      tileWidth: TILE,
-      tileHeight: TILE,
-      width: MAP[0].length,
-      height: MAP.length,
-    })
-    // 用生成的贴图拼一张 3 帧图集：草、路、水
-    const atlas = this.textures.createCanvas('tiles', TILE * 3, TILE)!
-    atlas.drawFrame('tile-grass', undefined, 0, 0)
-    atlas.drawFrame('tile-path', undefined, TILE, 0)
-    atlas.drawFrame('tile-water', undefined, TILE * 2, 0)
-    atlas.refresh()
-    const tiles = map.addTilesetImage('tiles', 'tiles', TILE, TILE, 0, 0)!
-    const layer = map.createBlankLayer('ground', tiles, 0, 0)!
-    MAP.forEach((row, y) => row.forEach((t, x) => layer.putTileAt(t === 3 ? 0 : t, x, y)))
+    this.ready = false
+    this.transitioning = false
+    void this.initWorld()
+  }
 
-    // 障碍层（树）
-    const obstacles = this.physics.add.staticGroup()
-    MAP.forEach((row, y) =>
-      row.forEach((t, x) => {
-        if (t !== 3) return
-        layer.putTileAt(0, x, y)
-        obstacles
-          .create(x * TILE + TILE / 2, y * TILE + TILE / 2, 'tree')
-          ?.setSize(TILE, TILE)
-          .setOffset(0, -8)
-          .refreshBody()
-      }),
-    )
+  private async initWorld(): Promise<void> {
+    const route = (this.scene.settings.data ?? {}) as SceneRoute
+    const save = await loadSave()
+    this.gameMap = getGameMap(route.mapId ?? save?.mapId ?? DEFAULT_MAP_ID)
+    this.mapId = this.gameMap.id
 
-    // 示例 NPC
-    const moDafu = this.physics.add.staticImage(21.5 * TILE, 14 * TILE, 'npc')
-    moDafu.setInteractive({ useHandCursor: true })
-    moDafu.on('pointerdown', () => this.tryInteract())
-    this.npcs.push({ id: 'mo_dafu', sprite: moDafu })
+    this.buildTerrain()
+    this.placePortals()
+    this.placeNpcs()
+
+    this.player = this.physics.add.sprite(0, 0, 'player')
+    this.player.setCollideWorldBounds(true)
+    this.physics.world.setBounds(0, 0, this.gameMap.width * TILE, this.gameMap.height * TILE)
+    this.physics.add.collider(this.player, this.obstacles)
+    this.cameras.main.startFollow(this.player, true, 0.15, 0.15)
+    this.cameras.main.setBounds(0, 0, this.gameMap.width * TILE, this.gameMap.height * TILE)
+
+    this.spawnEnemyWolves()
+    this.bindInputs()
+    this.bindBusEvents()
     this.prompt = this.add
       .text(0, 0, '[E] 交谈', {
         fontSize: '12px',
@@ -87,43 +86,213 @@ export class WorldScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setVisible(false)
 
-    // 玩家
-    this.player = this.physics.add.sprite(SPAWN.x, SPAWN.y, 'player')
-    this.player.setCollideWorldBounds(true)
-    this.physics.add.collider(this.player, obstacles)
-    this.cameras.main.startFollow(this.player, true, 0.15, 0.15)
-    this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels)
+    this.spawnPoint = {
+      x: this.gameMap.spawn.x * TILE + TILE / 2,
+      y: this.gameMap.spawn.y * TILE + TILE / 2,
+    }
+    let startX = this.spawnPoint.x
+    let startY = this.spawnPoint.y
+    if (
+      route.x !== undefined &&
+      route.y !== undefined &&
+      isWalkable(this.gameMap, route.x, route.y)
+    ) {
+      startX = route.x * TILE + TILE / 2
+      startY = route.y * TILE + TILE / 2
+    } else if (save && save.mapId === this.mapId) {
+      startX = save.x
+      startY = save.y
+    }
+    this.player.setPosition(startX, startY)
 
-    // 妖兽游荡 + 接触触发战斗
+    this.time.addEvent({
+      delay: 5000,
+      loop: true,
+      callback: () =>
+        void writeSave({
+          version: 1,
+          playerId: 'mortal-001',
+          x: this.player.x,
+          y: this.player.y,
+          mapId: this.mapId,
+          inventory: [],
+          savedAt: Date.now(),
+        }),
+    })
+
+    this.time.addEvent({
+      delay: 250,
+      loop: true,
+      callback: () =>
+        bus.emit('player:position', { x: this.player.x, y: this.player.y }),
+    })
+
+    this.cameras.main.fadeIn(FADE_MS, 0, 0, 0)
+    bus.emit('area:enter', { name: this.gameMap.name })
+    this.ready = true
+
+    this.events.on('shutdown', () => this.unsubs.forEach((u) => u()))
+  }
+
+  /** 地形与障碍：图例字符 → 图集帧 / 静态碰撞体 */
+  private buildTerrain(): void {
+    buildMapTileTextures(this)
+    const m = this.make.tilemap({
+      tileWidth: TILE,
+      tileHeight: TILE,
+      width: this.gameMap.width,
+      height: this.gameMap.height,
+    })
+    const tiles = m.addTilesetImage(MAP_ATLAS_KEY, MAP_ATLAS_KEY, TILE, TILE, 0, 0)!
+    const layer = m.createBlankLayer('ground', tiles, 0, 0)!
+    const obstacles = this.physics.add.staticGroup()
+    this.obstacles = obstacles
+
+    this.gameMap.rows.forEach((row, y) =>
+      row.split('').forEach((ch, x) => {
+        const cx = x * TILE + TILE / 2
+        const cy = y * TILE + TILE / 2
+        switch (ch) {
+          case ',':
+            layer.putTileAt(FRAME.PATH, x, y)
+            break
+          case '~':
+            layer.putTileAt(FRAME.WATER, x, y)
+            break
+          case 'B':
+            layer.putTileAt(FRAME.BRIDGE, x, y)
+            break
+          case 'F':
+            layer.putTileAt(FRAME.FLOWER, x, y)
+            break
+          case 'D':
+            layer.putTileAt(FRAME.DOOR, x, y)
+            break
+          case '#':
+            layer.putTileAt(FRAME.WALL, x, y)
+            obstacles.create(cx, cy, MAP_ATLAS_KEY, FRAME.WALL)?.setSize(TILE, TILE).refreshBody()
+            break
+          case 'T':
+            layer.putTileAt(FRAME.GRASS, x, y)
+            obstacles.create(cx, cy, 'tree')?.setSize(TILE, TILE).setOffset(0, -8).refreshBody()
+            break
+          case 'H':
+            layer.putTileAt(FRAME.GRASS, x, y)
+            obstacles.create(cx, cy, HOUSE_KEY)?.setSize(TILE, TILE).refreshBody()
+            break
+          default:
+            layer.putTileAt(FRAME.GRASS, x, y)
+        }
+      }),
+    )
+  }
+
+  /** 传送门：踏入后淡出 → restart 携带目标地图与落点 */
+  private placePortals(): void {
+    this.portalZones = this.gameMap.portals.map((p) => {
+      const zone = this.add.zone(p.x * TILE + TILE / 2, p.y * TILE + TILE / 2, TILE, TILE)
+      this.physics.add.existing(zone, true)
+      this.add
+        .text(zone.x, zone.y - TILE, p.label, {
+          fontSize: '11px',
+          color: '#bff3e8',
+          backgroundColor: 'rgba(26,18,11,0.7)',
+          padding: { x: 4, y: 2 },
+        })
+        .setOrigin(0.5)
+      return { zone, to: p.to }
+    })
+  }
+
+  private placeNpcs(): void {
+    this.npcs = []
+    this.gameMap.npcPlacements.forEach(({ npcId, x, y }) => {
+      const sprite = this.physics.add.staticImage(
+        x * TILE + TILE / 2,
+        y * TILE + TILE / 2,
+        'npc',
+      )
+      sprite.setInteractive({ useHandCursor: true })
+      sprite.on('pointerdown', () => this.tryInteract())
+      this.npcs.push({ id: npcId, sprite })
+    })
+  }
+
+  /** 妖兽：按 DSL 出生点游荡，越界则折返 */
+  private spawnEnemyWolves(): void {
     this.wolves = this.physics.add.group()
-    ENEMY_SPAWNS.forEach(({ x, y }) => {
-      const wolf = this.wolves.create(x, y, 'wolf') as Phaser.Physics.Arcade.Sprite
+    this.gameMap.enemySpawns.forEach(({ enemyId, x, y, radius }) => {
+      const wx = x * TILE + TILE / 2
+      const wy = y * TILE + TILE / 2
+      const wolf = this.wolves.create(wx, wy, 'wolf') as Phaser.Physics.Arcade.Sprite
       wolf.setCollideWorldBounds(true)
+      wolf.setData('enemyId', enemyId)
+      wolf.setData('homeX', wx)
+      wolf.setData('homeY', wy)
+      wolf.setData('radius', radius)
       this.time.addEvent({
         delay: ENEMY_WANDER_INTERVAL,
         loop: true,
         callback: () => {
-          if (this.battleActive) return
-          wolf.setVelocity(
-            Phaser.Math.Between(-1, 1) * ENEMY_SPEED,
-            Phaser.Math.Between(-1, 1) * ENEMY_SPEED,
-          )
+          if (this.battleActive || !wolf.body) return
+          const hx = wolf.getData('homeX') as number
+          const hy = wolf.getData('homeY') as number
+          const r = wolf.getData('radius') as number
+          if (Phaser.Math.Distance.Between(wolf.x, wolf.y, hx, hy) > r) {
+            const dir = new Phaser.Math.Vector2(hx - wolf.x, hy - wolf.y).normalize()
+            wolf.setVelocity(dir.x * ENEMY_SPEED, dir.y * ENEMY_SPEED)
+          } else {
+            wolf.setVelocity(
+              Phaser.Math.Between(-1, 1) * ENEMY_SPEED,
+              Phaser.Math.Between(-1, 1) * ENEMY_SPEED,
+            )
+          }
         },
       })
     })
-    this.physics.add.collider(this.wolves, obstacles)
-    this.physics.add.collider(this.player, this.wolves)
-    this.physics.add.overlap(this.player, this.wolves, (_p, wolfObj) => {
+    this.physics.add.collider(this.wolves, this.obstacles!)
+    this.physics.add.collider(this.player!, this.wolves)
+    this.physics.add.overlap(this.player!, this.wolves, (_p, wolfObj) => {
       const wolf = wolfObj as Phaser.Physics.Arcade.Sprite
-      if (this.battleActive || !wolf.body) return
+      if (this.battleActive || this.transitioning || !wolf.body) return
       this.activeEnemy = wolf
       this.battleActive = true
-      this.player.setVelocity(0, 0)
+      this.player!.setVelocity(0, 0)
       this.joyVec = { x: 0, y: 0 }
-      bus.emit('battle:start', { enemyId: ENEMY_ID })
+      bus.emit('battle:start', { enemyId: wolf.getData('enemyId') as string })
     })
+    this.physics.add.overlap(this.player!, this.portalZones.map((z) => z.zone), (_p, zObj) => {
+      if (this.transitioning || this.battleActive) return
+      const hit = this.portalZones.find((z) => z.zone === zObj)
+      if (!hit) return
+      this.transitionTo(hit.to)
+    })
+  }
 
-    // 摇杆输入 + 键盘备用
+  private transitionTo(to: PortalTarget): void {
+    this.transitioning = true
+    this.player!.setVelocity(0, 0)
+    this.joyVec = { x: 0, y: 0 }
+    this.cameras.main.fadeOut(FADE_MS, 0, 0, 0)
+    this.cameras.main.once('camerafadeoutcomplete', () =>
+      this.scene.restart({ mapId: to.map, x: to.x, y: to.y }),
+    )
+  }
+
+  private bindInputs(): void {
+    const cursors = this.input.keyboard!.createCursorKeys()
+    const wasd = this.input.keyboard!.addKeys('W,A,S,D') as Record<
+      'W' | 'A' | 'S' | 'D',
+      Phaser.Input.Keyboard.Key
+    >
+    this.interactKey = this.input.keyboard!.addKey('E')
+    this.keyState = () => ({
+      x: (cursors.right.isDown || wasd.D.isDown ? 1 : 0) - (cursors.left.isDown || wasd.A.isDown ? 1 : 0),
+      y: (cursors.down.isDown || wasd.S.isDown ? 1 : 0) - (cursors.up.isDown || wasd.W.isDown ? 1 : 0),
+    })
+  }
+
+  private bindBusEvents(): void {
     this.unsubs.push(
       bus.on('joystick:move', (v) => (this.joyVec = v)),
       bus.on('joystick:end', () => (this.joyVec = { x: 0, y: 0 })),
@@ -139,53 +308,16 @@ export class WorldScene extends Phaser.Scene {
         if (win) {
           this.activeEnemy?.destroy()
         } else {
-          this.player.setPosition(SPAWN.x, SPAWN.y)
+          this.player.setPosition(this.spawnPoint.x, this.spawnPoint.y)
           this.joyVec = { x: 0, y: 0 }
         }
         this.activeEnemy = undefined
       }),
     )
-    const cursors = this.input.keyboard!.createCursorKeys()
-    const wasd = this.input.keyboard!.addKeys('W,A,S,D') as Record<
-      'W' | 'A' | 'S' | 'D',
-      Phaser.Input.Keyboard.Key
-    >
-    this.interactKey = this.input.keyboard!.addKey('E')
-    this.keyState = () => ({
-      x: (cursors.right.isDown || wasd.D.isDown ? 1 : 0) - (cursors.left.isDown || wasd.A.isDown ? 1 : 0),
-      y: (cursors.down.isDown || wasd.S.isDown ? 1 : 0) - (cursors.up.isDown || wasd.W.isDown ? 1 : 0),
-    })
-
-    // 存档恢复 + 自动保存
-    void loadSave().then((save) => {
-      if (save) this.player.setPosition(save.x, save.y)
-      this.time.addEvent({
-        delay: 5000,
-        loop: true,
-        callback: () =>
-          void writeSave({
-            version: 1,
-            playerId: 'mortal-001',
-            x: this.player.x,
-            y: this.player.y,
-            inventory: [],
-            savedAt: Date.now(),
-          }),
-      })
-    })
-
-    // 上报坐标给 HUD
-    this.time.addEvent({
-      delay: 250,
-      loop: true,
-      callback: () =>
-        bus.emit('player:position', { x: this.player.x, y: this.player.y }),
-    })
-
-    this.events.on('shutdown', () => this.unsubs.forEach((u) => u()))
   }
 
   update(): void {
+    if (!this.ready || !this.player?.body || this.transitioning) return
     if (this.dialogueOpen || this.battleActive) {
       this.player.setVelocity(0, 0)
       return

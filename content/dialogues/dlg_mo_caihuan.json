@@ -1,0 +1,15 @@
+{
+  "id": "dlg_mo_caihuan",
+  "npcId": "mo_caihuan",
+  "entry": "greet",
+  "nodes": [
+    {
+      "id": "greet",
+      "speaker": "莫彩环",
+      "text": "（她在水塘边浣洗衣裳，抬头一笑）咦，生面孔。你是爹爹新收的杂役吧？往东那条山道旁的野花开了，采几束回来，我给你缝个香囊。",
+      "choices": [
+        { "text": "多谢姑娘美意，改日一定。", "next": null }
+      ]
+    }
+  ]
+}

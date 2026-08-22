@@ -6,7 +6,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { z } from 'zod'
-import { ItemSchema, SkillSchema, NpcSchema, RegionSchema, DialogueSchema, EnemySchema, QuestSchema } from '../src/systems/schemas'
+import { ItemSchema, SkillSchema, NpcSchema, RegionSchema, DialogueSchema, EnemySchema, QuestSchema, GameMapSchema, WALKABLE_TILE_CHARS } from '../src/systems/schemas'
 
 const ROOT = join(import.meta.dirname, '..', 'content')
 
@@ -35,12 +35,27 @@ check('区域', RegionSchema, 'world')
 check('对话', DialogueSchema, 'dialogues')
 check('妖兽', EnemySchema, 'enemies')
 check('任务', QuestSchema, 'quests')
+check('地图', GameMapSchema, 'maps')
 
 const regionIds = new Set(readAll('world').map((r) => String(r['id'])))
 const npcIds = new Set(readAll('npcs').map((n) => String(n['id'])))
 const itemIds = new Set(readAll('items').map((i) => String(i['id'])))
 const enemyIds = new Set(readAll('enemies').map((e) => String(e['id'])))
 const questIds = new Set(readAll('quests').map((q) => String(q['id'])))
+const mapIds = new Set(readAll('maps').map((m) => String(m['id'])))
+
+interface RawMap {
+  id: string
+  rows: string[]
+  spawn: { x: number; y: number }
+  portals: Array<{ x: number; y: number; to: { map: string; x: number; y: number }; label: string }>
+  npcPlacements: Array<{ npcId: string; x: number; y: number }>
+  enemySpawns: Array<{ enemyId: string; x: number; y: number }>
+}
+
+function tileWalkable(rows: string[], x: number, y: number): boolean {
+  return WALKABLE_TILE_CHARS.has(rows[y]?.[x] ?? '')
+}
 
 function refErr(owner: string, label: string, id: string) {
   errors++
@@ -116,6 +131,40 @@ function checkRefs() {
     const rewardItems = (quest['rewards'] as { items?: string[] })?.items ?? []
     for (const it of rewardItems) {
       if (!itemIds.has(it)) refErr(`任务 ${qid}`, '奖励物品', it)
+    }
+  }
+  for (const raw of readAll('maps')) {
+    const m = raw as unknown as RawMap
+    const mid = m.id
+    const spots: Array<readonly [string, number, number]> = [
+      ['出生点', m.spawn.x, m.spawn.y],
+      ...m.portals.map((p) => ['传送点', p.x, p.y] as const),
+      ...m.npcPlacements.map((n) => [`NPC ${n.npcId}`, n.x, n.y] as const),
+      ...m.enemySpawns.map((e) => [`妖兽 ${e.enemyId}`, e.x, e.y] as const),
+    ]
+    for (const [label, x, y] of spots) {
+      if (!tileWalkable(m.rows, x, y)) {
+        errors++
+        console.error(`✗ [地图] ${mid} 的${label}落在不可行走格 (${x},${y})`)
+      }
+    }
+    for (const p of m.portals) {
+      if (!mapIds.has(p.to.map)) {
+        errors++
+        console.error(`✗ [引用] 地图 ${mid} 传送点 (${p.x},${p.y}) 的目标地图 "${p.to.map}" 不存在`)
+        continue
+      }
+      const target = readAll('maps').find((t) => t['id'] === p.to.map) as unknown as RawMap
+      if (!tileWalkable(target.rows, p.to.x, p.to.y)) {
+        errors++
+        console.error(`✗ [地图] 地图 ${mid} 传送点 (${p.x},${p.y}) 的落点 (${p.to.x},${p.to.y}) 在 "${p.to.map}" 上不可行走`)
+      }
+    }
+    for (const n of m.npcPlacements) {
+      if (!npcIds.has(n.npcId)) refErr(`地图 ${mid}`, 'NPC', n.npcId)
+    }
+    for (const e of m.enemySpawns) {
+      if (!enemyIds.has(e.enemyId)) refErr(`地图 ${mid}`, '妖兽', e.enemyId)
     }
   }
   console.log('✓ 引用完整性校验通过')
