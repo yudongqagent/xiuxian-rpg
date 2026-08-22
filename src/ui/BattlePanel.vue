@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onUnmounted, ref } from 'vue'
+import { onUnmounted, ref, toRaw } from 'vue'
 import { bus } from '../engine/eventBus'
 import { EnemySchema } from '../systems/schemas'
 import {
@@ -26,10 +26,13 @@ const unsubStart = bus.on('battle:start', ({ enemyId }) => {
 onUnmounted(unsubStart)
 
 function act(action: BattleAction): void {
-  if (!state.value || state.value.over) return
-  if (action === 'attack') state.value = playerAttack(state.value)
-  else if (action === 'skill') state.value = playerSkill(state.value)
-  else state.value = attemptFlee(state.value)
+  const cur = state.value
+  if (!cur || cur.over) return
+  // combat.ts 内部用 structuredClone，不能传入响应式 Proxy
+  const raw = toRaw(cur)
+  if (action === 'attack') state.value = playerAttack(raw)
+  else if (action === 'skill') state.value = playerSkill(raw)
+  else state.value = attemptFlee(raw)
 }
 
 function close(): void {

@@ -4,33 +4,31 @@ import { bus } from '../engine/eventBus'
 import { getDialogueByNpc } from '../systems/dialogues'
 import type { Dialogue } from '../systems/schemas'
 
-const nodeId = ref<string | null>(null)
-let active: Dialogue | undefined
+const view = ref<{ dialogue: Dialogue; nodeId: string } | null>(null)
 
-const node = computed(() => active?.nodes.find((n) => n.id === nodeId.value))
+const node = computed(() => view.value?.dialogue.nodes.find((n) => n.id === view.value?.nodeId))
 const choices = computed(() => node.value?.choices ?? [])
 
 function open(npcId: string): void {
   const d = getDialogueByNpc(npcId)
   if (!d || !d.nodes.some((n) => n.id === d.entry)) return
-  active = d
-  nodeId.value = d.entry
+  view.value = { dialogue: d, nodeId: d.entry }
 }
 
 function choose(i: number): void {
   const c = choices.value[i]
   if (!c) return
-  if (c.next === null || !active?.nodes.some((n) => n.id === c.next)) return close()
-  nodeId.value = c.next
+  if (c.next === null || !view.value?.dialogue.nodes.some((n) => n.id === c.next)) return close()
+  view.value = { ...view.value, nodeId: c.next }
 }
 
 function close(): void {
-  nodeId.value = null
+  view.value = null
   bus.emit('dialogue:close')
 }
 
 function onKey(e: KeyboardEvent): void {
-  if (!nodeId.value) return
+  if (!view.value) return
   const idx = Number(e.key)
   if (idx >= 1 && idx <= 9) return choose(idx - 1)
   if (e.key === 'e' || e.key === 'E' || e.key === 'Enter') {
