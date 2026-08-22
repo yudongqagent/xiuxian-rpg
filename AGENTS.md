@@ -20,8 +20,9 @@ working copy:
 
 1. Before starting work, create a worktree:
    ```
-   git worktree add ../xiuxian-rpg-<branch-name> -b <branch-name>
+   git worktree add ../<branch-name> -b <branch-name>
    ```
+   Worktrees live as siblings of `main/` inside `xiuxian-rpg/`.
    Use a short, descriptive branch name (e.g. `add-world-content`).
 2. Perform all edits and run builds/tests inside that worktree.
 3. Never create, edit, or delete files in the primary checkout.
