@@ -9,7 +9,8 @@
     "preview": "vite preview --host",
     "validate": "tsx scripts/validate.ts",
     "check:combat": "tsx scripts/combat-check.ts",
-    "check:quest": "tsx scripts/quest-check.ts"
+    "check:quest": "tsx scripts/quest-check.ts",
+    "qa:local": "node scripts/qa-local.mjs"
   },
   "dependencies": {
     "phaser": "^3.90.0",
