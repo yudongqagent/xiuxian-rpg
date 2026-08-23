@@ -22,8 +22,10 @@ function runQuestAction(a: DialogueAction): void {
 
 function open(npcId: string): void {
   const d = getDialogueByNpc(npcId)
+  // 无对话内容的 NPC：直接忽略，不冻结世界（修复软锁）
   if (!d || !d.nodes.some((n) => n.id === d.entry)) return
   view.value = { dialogue: d, nodeId: d.entry }
+  bus.emit('dialogue:state', { open: true })
 }
 
 function choose(i: number): void {
@@ -34,12 +36,15 @@ function choose(i: number): void {
 }
 
 function close(): void {
+  if (!view.value) return
   view.value = null
   bus.emit('dialogue:close')
+  bus.emit('dialogue:state', { open: false })
 }
 
 function onKey(e: KeyboardEvent): void {
   if (!view.value) return
+  if (e.key === 'Escape') return close()
   const idx = Number(e.key)
   if (idx >= 1 && idx <= 9) return choose(idx - 1)
   if (e.key === 'e' || e.key === 'E' || e.key === 'Enter') {
@@ -48,18 +53,28 @@ function onKey(e: KeyboardEvent): void {
   }
 }
 
+function onVis(): void {
+  if (document.hidden && view.value) close()
+}
+
 const unOpen = bus.on('dialogue:open', ({ npcId }) => open(npcId))
 const unQuest = bus.on('quest:updated', () => questVersion.value++)
-onMounted(() => window.addEventListener('keydown', onKey))
+onMounted(() => {
+  window.addEventListener('keydown', onKey)
+  document.addEventListener('visibilitychange', onVis)
+})
 onUnmounted(() => {
   unOpen()
   unQuest()
   window.removeEventListener('keydown', onKey)
+  document.removeEventListener('visibilitychange', onVis)
+  if (view.value) close()
 })
 </script>
 
 <template>
   <div v-if="node" class="dialogue">
+    <button class="close" aria-label="关闭" @click="close">✕</button>
     <div class="speaker">{{ node.speaker }}</div>
     <p class="text">{{ node.text }}</p>
     <div v-if="choices.length || questActions.length" class="choices">
@@ -82,6 +97,18 @@ onUnmounted(() => {
   border-top: 1px solid #8b6914;
   color: #e8dcc0;
   padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
+}
+.close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  min-width: 32px;
+  min-height: 32px;
+  border: 1px solid rgba(139, 105, 20, 0.5);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #e8dcc0;
+  font-size: 14px;
 }
 .speaker {
   color: #ffd97a;

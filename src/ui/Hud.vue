@@ -41,7 +41,7 @@ function pctOf(v: number, max: number): string {
     </div>
     <button class="btn" @click="$emit('open-quests')">任务</button>
     <button class="btn" @click="$emit('open-inventory')">背包</button>
-    <div class="coords">{{ Math.round(pos.x / 32) }},{{ Math.round(pos.y / 32) }}</div>
+    <div class="coords">{{ Math.floor(pos.x / 32) }},{{ Math.floor(pos.y / 32) }}</div>
   </div>
   <button v-if="tracked" class="tracker" @click="$emit('open-quests')">
     <span class="tname">「{{ tracked.quest.name }}」</span>

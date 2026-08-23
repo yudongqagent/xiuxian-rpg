@@ -10,6 +10,8 @@ type GameEvents = {
   'player:position': { x: number; y: number }
   'dialogue:open': { npcId: string }
   'dialogue:close': void
+  /** 对话面板真实开/关状态（仅当 UI 确认打开后才冻结世界，防止无对话 NPC 软锁） */
+  'dialogue:state': { open: boolean }
   /** 世界层触发遭遇，enemyId 对应 content/enemies/<id>.json */
   'battle:start': { enemyId: string }
   /** UI 层玩家指令 */

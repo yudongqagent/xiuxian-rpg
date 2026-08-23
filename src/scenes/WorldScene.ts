@@ -68,6 +68,7 @@ export class WorldScene extends Phaser.Scene {
   private obstacles!: Phaser.Physics.Arcade.StaticGroup
   private ready = false
   private transitioning = false
+  private battleGraceUntil = 0
   // ==== rich-graphics ====
   private heroDust: { setMoving: (moving: boolean) => void } | null = null
   private heroDir: 'down' | 'up' | 'side' = 'down'
@@ -325,7 +326,8 @@ export class WorldScene extends Phaser.Scene {
     this.physics.add.collider(this.player!, this.wolves)
     this.physics.add.overlap(this.player!, this.wolves, (_p, wolfObj) => {
       const wolf = wolfObj as Phaser.Physics.Arcade.Sprite
-      if (this.battleActive || this.transitioning || !wolf.body) return
+      if (this.battleActive || this.transitioning || this.dialogueOpen) return
+      if (this.time.now < this.battleGraceUntil) return
       this.activeEnemy = wolf
       this.battleActive = true
       this.player!.setVelocity(0, 0)
@@ -367,22 +369,37 @@ export class WorldScene extends Phaser.Scene {
     this.unsubs.push(
       bus.on('joystick:move', (v) => (this.joyVec = v)),
       bus.on('joystick:end', () => (this.joyVec = { x: 0, y: 0 })),
-      bus.on('dialogue:open', () => {
-        this.dialogueOpen = true
-        this.joyVec = { x: 0, y: 0 }
-        this.prompt.setVisible(false)
+      // 仅当对话面板确认打开后才冻结世界（修复无对话 NPC 的软锁）
+      bus.on('dialogue:state', ({ open }) => {
+        this.dialogueOpen = open
+        if (open) {
+          this.joyVec = { x: 0, y: 0 }
+          this.prompt.setVisible(false)
+        }
       }),
-      bus.on('dialogue:close', () => (this.dialogueOpen = false)),
       bus.on('battle:start', () => (this.battleActive = true)),
       bus.on('battle:end', ({ win, fled }) => {
         this.battleActive = false
+        // 战斗结束后短暂免遭遇窗口，防止贴身妖兽瞬间再开战
+        this.battleGraceUntil = this.time.now + 1400
         if (win) {
           this.activeEnemy?.destroy()
-        } else if (!fled) {
-          // 战败（非逃跑）：宽惩罚——气血折半，送回出生点
-          updatePlayer(respawnPenalty)
-          bus.emit('player:stats')
-          this.player.setPosition(this.spawnPoint.x, this.spawnPoint.y)
+        } else {
+          const enemy = this.activeEnemy
+          if (fled && enemy && enemy.body) {
+            // 逃跑：双方弹开，避免仍处重叠区立刻重入战斗
+            const dir = new Phaser.Math.Vector2(this.player.x - enemy.x, this.player.y - enemy.y)
+            if (dir.lengthSq() < 0.01) dir.set(Phaser.Math.Between(-1, 1), Phaser.Math.Between(-1, 1))
+            dir.normalize().scale(220)
+            this.player.setVelocity(dir.x, dir.y)
+            ;(enemy.body as Phaser.Physics.Arcade.Body).setVelocity(-dir.x * 0.6, -dir.y * 0.6)
+          }
+          if (!fled) {
+            // 战败（非逃跑）：宽惩罚——气血折半，送回出生点
+            updatePlayer(respawnPenalty)
+            bus.emit('player:stats')
+            this.player.setPosition(this.spawnPoint.x, this.spawnPoint.y)
+          }
           this.joyVec = { x: 0, y: 0 }
         }
         this.activeEnemy = undefined
