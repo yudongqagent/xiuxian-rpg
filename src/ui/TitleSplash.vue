@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
+const emit = defineEmits<{ start: [] }>()
+
 const VERSION = 'v0.1.0'
 const FADE_MS = 850
 
@@ -10,6 +12,7 @@ const gone = ref(false)
 function start(): void {
   if (leaving.value) return
   leaving.value = true
+  emit('start')
   window.setTimeout(() => (gone.value = true), FADE_MS)
 }
 </script>

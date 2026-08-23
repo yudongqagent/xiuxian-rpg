@@ -33,6 +33,13 @@ const pos = async () => {
   return m ? { x: +m[1], y: +m[2] } : null
 }
 const held = new Set()
+async function dismissSplash() {
+  const startBtn = page.locator('.splash .start, .splash button').first()
+  if (await startBtn.isVisible({ timeout: 4000 }).catch(() => false)) {
+    await startBtn.click()
+    await page.waitForTimeout(1200)
+  }
+}
 async function navTo(tx, ty, tol = 0.9) {
   for (let i = 0; i < 200; i++) {
     const p = await pos()
@@ -53,12 +60,11 @@ async function navTo(tx, ty, tol = 0.9) {
 try {
   await page.goto(URL, { waitUntil: 'networkidle', timeout: 60000 })
 
-  // 标题画面：若存在则点击「开始游戏」进入（splash v-if 移除后不再拦截点击）
-  const startBtn = page.locator('.splash .start, .splash button').first()
-  if (await startBtn.isVisible({ timeout: 4000 }).catch(() => false)) {
-    await startBtn.click()
-    add('标题画面 → 开始', true)
-    await page.waitForTimeout(1200)
+  // 标题画面：若存在则点击「开始游戏」进入（懒加载 Phaser 由此触发）
+  {
+    const t0 = Date.now()
+    await dismissSplash()
+    if (Date.now() - t0 > 500) add('标题画面 → 开始', true)
   }
 
   // 0. 区域横幅（进入默认地图七玄门山村时短暂展示，轮询捕捉；同时等待场景就绪）
@@ -200,6 +206,7 @@ try {
   await page.waitForTimeout(6000)
   const savedPos = await pos()
   await page.reload({ waitUntil: 'networkidle' })
+  await dismissSplash() // 懒启动：重载后需再次点击开始，游戏才会引导擎
   await page.waitForTimeout(9000)
   const restoredPos = await pos()
   add('自动存档 & 重载恢复',
