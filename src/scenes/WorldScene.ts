@@ -28,6 +28,17 @@ import {
   idleBob,
   npcTextureFor,
 } from './fx'
+// ==== gfx-scene：场景表现层（B1 过渡/B2 道具/B3 视差/B4 流水/C1 天气/C2 昼夜/C3 光晕）====
+import { buildProps } from './mapTiles'
+import {
+  addFlowingWater,
+  addLightHalos,
+  addParallax,
+  attachDayNight,
+  attachWeather,
+  bakeTerrainBlend,
+  placeProps,
+} from './sceneScene'
 
 const TILE = 32
 const PLAYER_SPEED = 160
@@ -96,7 +107,7 @@ export class WorldScene extends Phaser.Scene {
 
     // ==== rich-graphics：氛围/环境动效 ====
     buildFxTextures(this)
-    applyAtmosphere(this, this.mapId)
+    const atmosphere = applyAtmosphere(this, this.mapId)
     addAmbientFx(this, {
       rows: this.gameMap.rows,
       trees: this.treeSprites,
@@ -129,6 +140,27 @@ export class WorldScene extends Phaser.Scene {
     this.spawnEnemyWolves()
     this.bindInputs()
     this.bindBusEvents()
+
+    // ==== gfx-scene：场景表现层装配（B1-B4 / C1-C3）====
+    buildProps(this)
+    addParallax(
+      this,
+      this.mapId,
+      this.gameMap.spawn.x * TILE + TILE / 2,
+      this.gameMap.spawn.y * TILE + TILE / 2,
+      this.gameMap.width * TILE,
+      this.gameMap.height * TILE,
+    )
+    bakeTerrainBlend(this, this.gameMap)
+    const { lanternLights } = placeProps(this, this.gameMap)
+    addFlowingWater(this, this.gameMap)
+    attachWeather(this, this.mapId)
+    attachDayNight(this, atmosphere.grade)
+    addLightHalos(this, [
+      ...lanternLights,
+      ...this.portalZones.map((z) => ({ x: z.zone.x, y: z.zone.y, color: 0x7ffce8 })),
+    ])
+
     this.prompt = this.add
       .text(0, 0, '[E] 交谈', {
         fontSize: '12px',

@@ -51,6 +51,7 @@ interface RawMap {
   portals: Array<{ x: number; y: number; to: { map: string; x: number; y: number }; label: string }>
   npcPlacements: Array<{ npcId: string; x: number; y: number }>
   enemySpawns: Array<{ enemyId: string; x: number; y: number }>
+  props?: Array<{ type: string; x: number; y: number }>
 }
 
 function tileWalkable(rows: string[], x: number, y: number): boolean {
@@ -165,6 +166,12 @@ function checkRefs() {
     }
     for (const e of m.enemySpawns) {
       if (!enemyIds.has(e.enemyId)) refErr(`地图 ${mid}`, '妖兽', e.enemyId)
+    }
+    for (const p of m.props ?? []) {
+      if (!tileWalkable(m.rows, p.x, p.y)) {
+        errors++
+        console.error(`✗ [地图] ${mid} 的道具 ${p.type} 落在不可行走格 (${p.x},${p.y})`)
+      }
     }
   }
   for (const enemy of readAll('enemies')) {

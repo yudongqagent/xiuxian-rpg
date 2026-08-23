@@ -91,5 +91,11 @@
       "y": 24,
       "radius": 112
     }
+  ],
+  "props": [
+    { "type": "signpost", "x": 16, "y": 1 },
+    { "type": "lantern", "x": 16, "y": 13 },
+    { "type": "lantern", "x": 20, "y": 13 },
+    { "type": "fence", "x": 32, "y": 15 }
   ]
 }

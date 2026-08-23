@@ -41,5 +41,11 @@
   "enemySpawns": [
     { "enemyId": "wuying_mang", "x": 14, "y": 14, "radius": 120 },
     { "enemyId": "yelang_bangzhong", "x": 22, "y": 8, "radius": 100 }
+  ],
+  "props": [
+    { "type": "signpost", "x": 1, "y": 13 },
+    { "type": "lantern", "x": 12, "y": 12 },
+    { "type": "stall", "x": 13, "y": 13 },
+    { "type": "lantern", "x": 14, "y": 12 }
   ]
 }
