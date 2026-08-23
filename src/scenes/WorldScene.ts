@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { bus } from '../engine/eventBus'
-import { loadSave, writeSave } from '../engine/save'
+import { AUTO_SLOT, loadSave, writeSave, type SlotId } from '../engine/save'
 import { DEFAULT_MAP_ID, getGameMap, isWalkable } from '../systems/maps'
 import type { GameMap } from '../systems/schemas'
 
@@ -143,6 +143,18 @@ export class WorldScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.waterBlockers)
     this.cameras.main.startFollow(this.player, true, 0.15, 0.15)
     this.cameras.main.setBounds(0, 0, this.gameMap.width * TILE, this.gameMap.height * TILE)
+    // PT-9：视口大于地图时放大镜头铺满，避免边缘露出虚空
+    const fitCamera = () => {
+      const z = Math.max(
+        1,
+        this.scale.width / (this.gameMap.width * TILE),
+        this.scale.height / (this.gameMap.height * TILE),
+      )
+      this.cameras.main.setZoom(z)
+    }
+    fitCamera()
+    this.scale.on('resize', fitCamera)
+    this.events.once('shutdown', () => this.scale.off('resize', fitCamera))
 
     this.spawnEnemyWolves()
     this.bindInputs()
@@ -208,17 +220,7 @@ export class WorldScene extends Phaser.Scene {
       loop: true,
       callback: () => {
         if (this.battleActive || this.transitioning) return
-        void writeSave({
-          version: SAVE_VERSION,
-          playerId: 'mortal-001',
-          x: this.player.x,
-          y: this.player.y,
-          mapId: this.mapId,
-          inventory: [],
-          savedAt: Date.now(),
-          player: toPlayerSave(getPlayer()),
-          quests: snapshotQuests(),
-        })
+        void writeSave(this.snapshotSave(), AUTO_SLOT)
       }
     })
 
@@ -438,6 +440,9 @@ export class WorldScene extends Phaser.Scene {
           this.prompt.setVisible(false)
         }
       }),
+      // ENG-5：手动存/读档
+      bus.on('save:write', ({ slot }) => void writeSave(this.snapshotSave(), slot as SlotId)),
+      bus.on('save:load', ({ slot }) => void this.loadFromSlot(slot as SlotId)),
       bus.on('battle:start', () => {
         this.battleActive = true
         this.battleAcked = false
@@ -533,6 +538,35 @@ export class WorldScene extends Phaser.Scene {
       }
     }
     return best
+  }
+
+  private snapshotSave() {
+    return {
+      version: SAVE_VERSION,
+      playerId: 'mortal-001',
+      x: this.player.x,
+      y: this.player.y,
+      mapId: this.mapId,
+      inventory: [],
+      savedAt: Date.now(),
+      player: toPlayerSave(getPlayer()),
+      quests: snapshotQuests(),
+    }
+  }
+
+  /** 从指定档位恢复：应用成长/任务后带落点重启场景 */
+  private async loadFromSlot(slot: SlotId): Promise<void> {
+    if (this.transitioning) return
+    const data = await loadSave(slot)
+    if (!data) return
+    setPlayer(fromPlayerSave(data.player))
+    restoreQuests(data.quests)
+    bus.emit('player:stats')
+    this.transitioning = true
+    this.cameras.main.fadeOut(FADE_MS, 0, 0, 0)
+    this.cameras.main.once('camerafadeoutcomplete', () =>
+      this.scene.restart({ mapId: data.mapId ?? this.mapId, x: Math.floor(data.x / TILE), y: Math.floor(data.y / TILE) }),
+    )
   }
 
   private tryInteract(): void {

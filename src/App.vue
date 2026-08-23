@@ -7,6 +7,7 @@ import DialogueBox from './ui/DialogueBox.vue'
 import BattlePanel from './ui/BattlePanel.vue'
 import AreaBanner from './ui/AreaBanner.vue'
 import QuestLog from './ui/QuestLog.vue'
+import SavePanel from './ui/SavePanel.vue'
 import QuestToast from './ui/QuestToast.vue'
 import TitleSplash from './ui/TitleSplash.vue'
 import BattleTransition from './ui/BattleTransition.vue'
@@ -15,6 +16,7 @@ import { initQuestRuntime } from './systems/questRuntime'
 const gameHost = ref<HTMLElement | null>(null)
 const showInv = ref(false)
 const showQuests = ref(false)
+const showSaves = ref(false)
 const booting = ref(false)
 let game: ReturnType<(typeof import('./engine/game'))['createGame']> | undefined
 let disposeQuests: (() => void) | undefined
@@ -38,10 +40,11 @@ onUnmounted(() => {
 <template>
   <div class="stage">
     <div ref="gameHost" class="game-host" />
-    <Hud @open-inventory="showInv = true" @open-quests="showQuests = true" />
+    <Hud @open-inventory="showInv = true" @open-quests="showQuests = true" @open-saves="showSaves = true" />
     <Joystick />
     <InventoryPanel v-if="showInv" @close="showInv = false" />
     <QuestLog v-if="showQuests" @close="showQuests = false" />
+    <SavePanel v-if="showSaves" @close="showSaves = false" />
     <DialogueBox />
     <BattlePanel />
     <AreaBanner />

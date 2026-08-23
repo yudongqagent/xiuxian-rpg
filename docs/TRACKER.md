@@ -31,7 +31,7 @@
 | ENG-2 | 类型安全事件总线（Vue↔Phaser 唯一通道） | M0 | ✅ | G2/G4 | main |
 | ENG-3 | IndexedDB 存档 + 5s 自动保存 + 启动恢复 | M0 | ✅ | G4/G5 | main |
 | ENG-4 | 存档向后兼容扩展（mapId / player 成长字段） | M1 | 🚧 world-maps + combat-depth | G3/G4 | 两分支均 additive 可选字段 |
-| ENG-5 | 多存档位 ×3 + 手动存档 UI | M1 | ⬜ | G4 | — |
+| ENG-5 | 多存档位 ×3 + 手动存档 UI（存档面板/读取淡入恢复） | M2 | ✅（提前交付） | G4 | feat-saves：s1-s3 保存/读取 E2E 实测，meta 含时间·境界·地图 |
 | ENG-6 | 导出存档码 / 导入 | M2 | ⬜ | G4 | — |
 | ENG-7 | PWA（离线缓存、添加到主屏） | M4 | ⬜ | G6 | — |
 
@@ -164,10 +164,12 @@
 | PT-6 | minor | 切窗后按键状态残留（blur 未清键） | ✅ blur/visibilitychange 清空输入 |
 | PT-7 | minor | 战斗中重载→落点即再入战斗（自动存档暂停已缓解） | ✅ 缓解(hotfix) |
 | PT-8 | minor | 逃跑成功需二次点击且击退过远 | ✅ 0.7s 自动收面板 + 击退减半 |
-| PT-9 | nit | 宽屏下地图右缘露天空隙 | ⬜ |
+| PT-9 | nit | 宽屏下地图右缘露天空隙 | ✅ 相机 zoom 铺满（resize 自适应） |
 | PT-10 | nit | 简报笔误 五叶/七叶灵草 | ✅ 文档层面 |
 
 | 2026-08-22 | fix-progression：PT-2/3/4/5/6/8 修复；顺带修任务引擎缺陷——中途步骤推进不发 quest:updated 导致追踪条/日志停留旧文本 | 已发布 |
+
+| 2026-08-22 | feat-saves：ENG-5 三手动档+存档面板；PT-9 相机铺满修复 | 已发布 |
 
 > 集成约定：功能分支一律从最新 main 切出；集成在 release-* 工作树完成，冲突解决后跑满 G1–G4 再快进 main 发布。
 

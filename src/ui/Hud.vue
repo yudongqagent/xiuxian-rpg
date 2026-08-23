@@ -10,7 +10,7 @@ import {
 } from '../systems/player'
 import { getTrackedQuest, type TrackedQuestView } from '../systems/questRuntime'
 
-defineEmits<{ 'open-inventory': []; 'open-quests': [] }>()
+defineEmits<{ 'open-inventory': []; 'open-quests': []; 'open-saves': [] }>()
 
 const pos = ref({ x: 0, y: 0 })
 const player = ref(getPlayer())
@@ -39,6 +39,7 @@ function pctOf(v: number, max: number): string {
       <span class="hint">血 {{ player.hp }}/{{ stats.maxHp }} · 灵 {{ player.qi }}/{{ stats.maxQi }} · 修为
         {{ player.exp }}/{{ expToNext(player.level) }}</span>
     </div>
+    <button class="btn" @click="$emit('open-saves')">存档</button>
     <button class="btn" @click="$emit('open-quests')">任务</button>
     <button class="btn" @click="$emit('open-inventory')">背包</button>
     <div class="coords">{{ Math.floor(pos.x / 32) }},{{ Math.floor(pos.y / 32) }}</div>

@@ -1,9 +1,11 @@
-/** 存档系统：IndexedDB 单存档位 + 自动保存。后续可扩展多存档位/云同步。 */
+/** 存档系统：IndexedDB。auto 自动档 + s1/s2/s3 手动档（ENG-5）。 */
 import type { QuestSaveData } from '../systems/quests'
 
 const DB_NAME = 'xiuxian-save'
 const STORE = 'slots'
-const SLOT = 'auto'
+export const AUTO_SLOT = 'auto'
+export const MANUAL_SLOTS = ['s1', 's2', 's3'] as const
+export type SlotId = (typeof MANUAL_SLOTS)[number] | typeof AUTO_SLOT
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -39,11 +41,11 @@ export interface SaveData {
   quests?: QuestSaveData
 }
 
-export async function loadSave(): Promise<SaveData | null> {
+export async function loadSave(slot: SlotId = AUTO_SLOT): Promise<SaveData | null> {
   try {
     const db = await openDb()
     return await new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE, 'readonly').objectStore(STORE).get(SLOT)
+      const tx = db.transaction(STORE, 'readonly').objectStore(STORE).get(slot)
       tx.onsuccess = () => resolve((tx.result as SaveData) ?? null)
       tx.onerror = () => reject(tx.error)
     })
@@ -52,15 +54,37 @@ export async function loadSave(): Promise<SaveData | null> {
   }
 }
 
-export async function writeSave(data: SaveData): Promise<void> {
+export async function writeSave(data: SaveData, slot: SlotId = AUTO_SLOT): Promise<void> {
   try {
     const db = await openDb()
     await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(STORE, 'readwrite').objectStore(STORE).put(data, SLOT)
+      const tx = db.transaction(STORE, 'readwrite').objectStore(STORE).put(data, slot)
       tx.onsuccess = () => resolve()
       tx.onerror = () => reject(tx.error)
     })
   } catch {
     /* 存档失败不阻塞游戏 */
   }
+}
+
+export async function listSaves(): Promise<Record<string, SaveData | null>> {
+  const out: Record<string, SaveData | null> = { [AUTO_SLOT]: null, s1: null, s2: null, s3: null }
+  try {
+    const db = await openDb()
+    await new Promise<void>((resolve, reject) => {
+      const store = db.transaction(STORE, 'readonly').objectStore(STORE)
+      const req = store.openCursor()
+      req.onsuccess = () => {
+        const cursor = req.result
+        if (!cursor) return resolve()
+        const key = String(cursor.key)
+        if (key in out) out[key] = cursor.value as SaveData
+        cursor.continue()
+      }
+      req.onerror = () => reject(req.error)
+    })
+  } catch {
+    /* 列举失败按全空处理 */
+  }
+  return out
 }
