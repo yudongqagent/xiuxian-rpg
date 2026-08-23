@@ -6,6 +6,17 @@ import type { GameMap } from '../systems/schemas'
 
 type PortalTarget = GameMap['portals'][number]['to']
 import { FRAME, HOUSE_KEY, MAP_ATLAS_KEY, buildMapTileTextures } from './mapTiles'
+// ==== rich-graphics ====
+import {
+  addAmbientFx,
+  applyAtmosphere,
+  attachHeroDust,
+  bossAura,
+  buildFxTextures,
+  enemyVisualFor,
+  idleBob,
+  npcTextureFor,
+} from './fx'
 
 const TILE = 32
 const PLAYER_SPEED = 160
@@ -45,6 +56,10 @@ export class WorldScene extends Phaser.Scene {
   private obstacles!: Phaser.Physics.Arcade.StaticGroup
   private ready = false
   private transitioning = false
+  // ==== rich-graphics ====
+  private heroDust: { setMoving: (moving: boolean) => void } | null = null
+  private heroDir: 'down' | 'up' | 'side' = 'down'
+  private treeSprites: Phaser.GameObjects.Image[] = []
 
   constructor() {
     super('World')
@@ -66,7 +81,32 @@ export class WorldScene extends Phaser.Scene {
     this.placePortals()
     this.placeNpcs()
 
-    this.player = this.physics.add.sprite(0, 0, 'player')
+    // ==== rich-graphics：氛围/环境动效 ====
+    buildFxTextures(this)
+    applyAtmosphere(this, this.mapId)
+    addAmbientFx(this, {
+      rows: this.gameMap.rows,
+      trees: this.treeSprites,
+      portals: this.portalZones.map((z) => ({ x: z.zone.x, y: z.zone.y })),
+    })
+
+    this.player = this.physics.add.sprite(0, 0, 'hero', 0)
+    this.player.body?.setSize(20, 24)
+    // 行走动画（下/上/侧，侧向用 flipX）
+    const mkWalk = (key: string, row: number) =>
+      this.anims.create({
+        key,
+        frames: this.anims.generateFrameNumbers('hero', {
+          frames: [row * 3 + 1, row * 3 + 0, row * 3 + 2, row * 3 + 0],
+        }),
+        frameRate: 7,
+        repeat: -1,
+      })
+    if (!this.anims.exists('walk-down')) mkWalk('walk-down', 0)
+    if (!this.anims.exists('walk-up')) mkWalk('walk-up', 1)
+    if (!this.anims.exists('walk-side')) mkWalk('walk-side', 2)
+    this.heroDust = attachHeroDust(this, this.player)
+
     this.player.setCollideWorldBounds(true)
     this.physics.world.setBounds(0, 0, this.gameMap.width * TILE, this.gameMap.height * TILE)
     this.physics.add.collider(this.player, this.obstacles)
@@ -174,7 +214,11 @@ export class WorldScene extends Phaser.Scene {
             break
           case 'T':
             layer.putTileAt(FRAME.GRASS, x, y)
-            obstacles.create(cx, cy, 'tree')?.setSize(TILE, TILE).setOffset(0, -8).refreshBody()
+            // ==== rich-graphics：保留树精灵引用用于摇曳 ====
+            {
+              const t = obstacles.create(cx, cy, 'tree')?.setSize(TILE, TILE).setOffset(0, -8).refreshBody()
+              if (t) this.treeSprites.push(t)
+            }
             break
           case 'H':
             layer.putTileAt(FRAME.GRASS, x, y)
@@ -207,11 +251,13 @@ export class WorldScene extends Phaser.Scene {
   private placeNpcs(): void {
     this.npcs = []
     this.gameMap.npcPlacements.forEach(({ npcId, x, y }) => {
+      // ==== rich-graphics：按身份换装 + 待机浮动 ====
       const sprite = this.physics.add.staticImage(
         x * TILE + TILE / 2,
         y * TILE + TILE / 2,
-        'npc',
+        npcTextureFor(npcId),
       )
+      idleBob(this, sprite, 1.6)
       sprite.setInteractive({ useHandCursor: true })
       sprite.on('pointerdown', () => this.tryInteract())
       this.npcs.push({ id: npcId, sprite })
@@ -224,8 +270,13 @@ export class WorldScene extends Phaser.Scene {
     this.gameMap.enemySpawns.forEach(({ enemyId, x, y, radius }) => {
       const wx = x * TILE + TILE / 2
       const wy = y * TILE + TILE / 2
-      const wolf = this.wolves.create(wx, wy, 'wolf') as Phaser.Physics.Arcade.Sprite
+      // ==== rich-graphics：妖兽外观差异化 ====
+      const vis = enemyVisualFor(enemyId)
+      const wolf = this.wolves.create(wx, wy, vis.tex) as Phaser.Physics.Arcade.Sprite
+      wolf.setScale(vis.scale)
       wolf.setCollideWorldBounds(true)
+      if (vis.boss) bossAura(this, wx, wy)
+      else idleBob(this, wolf, 1.2)
       wolf.setData('enemyId', enemyId)
       wolf.setData('homeX', wx)
       wolf.setData('homeY', wy)
@@ -333,6 +384,30 @@ export class WorldScene extends Phaser.Scene {
     const vx = (this.joyVec.x + k.x) * PLAYER_SPEED
     const vy = (this.joyVec.y + k.y) * PLAYER_SPEED
     this.player.setVelocity(Phaser.Math.Clamp(vx, -PLAYER_SPEED, PLAYER_SPEED), Phaser.Math.Clamp(vy, -PLAYER_SPEED, PLAYER_SPEED))
+
+    // ==== rich-graphics：行走动画与尘土 ====
+    const moving = Math.abs(this.player.body.velocity.x) + Math.abs(this.player.body.velocity.y) > 4
+    this.heroDust?.setMoving(moving)
+    if (moving) {
+      const dir =
+        Math.abs(this.player.body.velocity.x) > Math.abs(this.player.body.velocity.y)
+          ? ('side' as const)
+          : this.player.body.velocity.y < 0
+            ? ('up' as const)
+            : ('down' as const)
+      if (dir !== this.heroDir) {
+        this.heroDir = dir
+        this.player.play(`walk-${dir}`, true)
+      } else if (!this.player.anims.isPlaying || this.player.anims.currentAnim?.key !== `walk-${dir}`) {
+        this.player.play(`walk-${dir}`, true)
+      }
+      if (dir === 'side') this.player.setFlipX(this.player.body.velocity.x < 0)
+      else this.player.setFlipX(false)
+    } else {
+      this.player.anims.stop()
+      const row = this.heroDir === 'down' ? 0 : this.heroDir === 'up' ? 1 : 2
+      this.player.setFrame(row * 3)
+    }
   }
 
   private nearestNpc(): { id: string; sprite: Phaser.GameObjects.Image } | null {
