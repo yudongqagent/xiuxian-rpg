@@ -39,7 +39,7 @@
   ],
   "npcPlacements": [],
   "enemySpawns": [
-    { "enemyId": "wuying_mang", "x": 14, "y": 14, "radius": 120 },
+    { "enemyId": "shan_xiao", "x": 14, "y": 14, "radius": 100 },
     { "enemyId": "yelang_bangzhong", "x": 22, "y": 8, "radius": 100 }
   ],
   "props": [
