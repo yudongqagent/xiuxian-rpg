@@ -160,6 +160,91 @@ export const QuestSchema = z.object({
     .default({}),
 })
 
+/** 地图字符图例（DSL 契约，WorldScene 与 validate 共用） */
+export const TILE_LEGEND = {
+  '.': '草地',
+  ',': '小路',
+  '~': '水面',
+  T: '树（障碍）',
+  '#': '墙/栅栏（障碍）',
+  H: '房屋（障碍）',
+  B: '桥',
+  F: '花草',
+  D: '门户/传送点',
+} as const
+
+export type TileChar = keyof typeof TILE_LEGEND
+
+const TILE_CHARS = Object.keys(TILE_LEGEND) as TileChar[]
+
+/** 可行走字符（其余为障碍或不可进入） */
+export const WALKABLE_TILE_CHARS: ReadonlySet<string> = new Set(['.', ',', 'B', 'F', 'D'])
+
+export const MapPortalSchema = z.object({
+  x: z.number().int().min(0),
+  y: z.number().int().min(0),
+  to: z.object({
+    map: z.string().regex(/^[a-z0-9_]+$/),
+    x: z.number().int().min(0),
+    y: z.number().int().min(0),
+  }),
+  label: z.string().min(1).max(12),
+})
+
+export const MapNpcPlacementSchema = z.object({
+  npcId: z.string().regex(/^[a-z0-9_]+$/),
+  x: z.number().int().min(0),
+  y: z.number().int().min(0),
+})
+
+export const MapEnemySpawnSchema = z.object({
+  enemyId: z.string().regex(/^[a-z0-9_]+$/),
+  x: z.number().int().min(0),
+  y: z.number().int().min(0),
+  /** 游荡半径（像素） */
+  radius: z.number().int().min(16).max(512).default(96),
+})
+
+export const GameMapSchema = z
+  .object({
+    id: z.string().regex(/^[a-z0-9_]+$/),
+    /** 区域名，进场横幅展示 */
+    name: z.string().min(1).max(20),
+    width: z.number().int().min(8).max(200),
+    height: z.number().int().min(8).max(200),
+    rows: z.array(z.string()).min(8).max(200),
+    spawn: z.object({ x: z.number().int().min(0), y: z.number().int().min(0) }),
+    portals: z.array(MapPortalSchema).max(12).default([]),
+    npcPlacements: z.array(MapNpcPlacementSchema).max(20).default([]),
+    enemySpawns: z.array(MapEnemySpawnSchema).max(20).default([]),
+  })
+  .superRefine((m, ctx) => {
+    const w = m.rows[0]?.length ?? -1
+    if (m.rows.some((r) => r.length !== w)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'rows 行宽不一致' })
+    }
+    if (w !== m.width || m.rows.length !== m.height) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'width/height 与 rows 尺寸不符' })
+    }
+    const chars = new Set<string>(TILE_CHARS)
+    m.rows.forEach((row, y) =>
+      row.split('').forEach((c, x) => {
+        if (!chars.has(c)) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: `非法图例字符 "${c}" @ (${x},${y})` })
+        }
+      }),
+    )
+    const inBounds = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < m.width && y < m.height
+    ;[m.spawn, ...m.portals.map((p) => ({ x: p.x, y: p.y })), ...m.npcPlacements].forEach((p) => {
+      if (!inBounds(p.x, p.y)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `坐标 (${p.x},${p.y}) 越界` })
+      }
+    })
+  })
+
+export type MapPortal = z.infer<typeof MapPortalSchema>
+export type GameMap = z.infer<typeof GameMapSchema>
+
 export type Item = z.infer<typeof ItemSchema>
 export type Enemy = z.infer<typeof EnemySchema>
 export type Skill = z.infer<typeof SkillSchema>

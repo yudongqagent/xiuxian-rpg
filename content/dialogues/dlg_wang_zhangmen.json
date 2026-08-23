@@ -1,0 +1,21 @@
+{
+  "id": "dlg_wang_zhangmen",
+  "npcId": "wang_zhangmen",
+  "entry": "greet",
+  "nodes": [
+    {
+      "id": "greet",
+      "speaker": "王掌门",
+      "text": "（他负手立在场院中，目光如电）新来的杂役？七玄门虽是江湖门派，规矩却不少——每日卯时点卯，误了时辰，扣半月月钱。",
+      "choices": [
+        { "text": "弟子记下了。敢问掌门，本门功夫当真有七路？", "next": "skills" },
+        { "text": "是。弟子先行告退。", "next": null }
+      ]
+    },
+    {
+      "id": "skills",
+      "speaker": "王掌门",
+      "text": "（他微微一哂）七路奇门，名动绿林。不过嘛……你能学到的，眼下只有挑水劈柴。把筋骨打熬好了，再说旁的。"
+    }
+  ]
+}

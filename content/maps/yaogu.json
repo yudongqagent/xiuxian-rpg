@@ -1,0 +1,45 @@
+{
+  "id": "yaogu",
+  "name": "密林妖谷",
+  "width": 36,
+  "height": 28,
+  "rows": [
+    "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
+    "T.TTT......TTT......TTTT.....TTT...T",
+    "T...TT....F.TTT..TT...TTT..TTTT....T",
+    "T..TTT.....TTT..TTT...TT...TT....F.T",
+    "T...TTT....TT....TT.......TTT......T",
+    "T..TTTT.F...TT........TT.......TT..T",
+    "T...TTT......TT...F....TTT...TTT...T",
+    "T....TT....TTTT........TT....TT....T",
+    "T..TTTT.....TT....TTT.......TTT....T",
+    "T..TT...F....TT....TT....F...TT....T",
+    "T...TTT......TTT.......TTT.........T",
+    "T.TTTT...TT.....,....TT.....TTT....T",
+    "T..TTT...TT....,,.....TT..F...TT...T",
+    "T..TT....T....,,,,......TT....TT...T",
+    "D,,,,,,,,,,,,....,,..........TT....T",
+    "T..TT....T....,,,,......TT....TT...T",
+    "T..TTT...TT....,,.....TT..F...TT...T",
+    "T.TTTT...TT......TT....TT.....TT...T",
+    "T...TTT......TTT.......TTT.........T",
+    "T..TT...F....TT....TT....F...TT....T",
+    "T..TTTT.....TT....TTT.......TTT....T",
+    "T....TT....TTTT........TT....TT....T",
+    "T...TTT......TT........TTT...TTT...T",
+    "T..TTTT.F...TT........TT.......TT..T",
+    "T...TTT....TT....TT.......TTT......T",
+    "T..TTT.....TTT..TTT...TT...TT....F.T",
+    "T...TT....F.TTT..TT...TTT..TTTT....T",
+    "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT"
+  ],
+  "spawn": { "x": 2, "y": 14 },
+  "portals": [
+    { "x": 0, "y": 14, "to": { "map": "shanji", "x": 34, "y": 16 }, "label": "西·山道" }
+  ],
+  "npcPlacements": [],
+  "enemySpawns": [
+    { "enemyId": "wuying_mang", "x": 14, "y": 14, "radius": 120 },
+    { "enemyId": "yelang_bangzhong", "x": 22, "y": 8, "radius": 100 }
+  ]
+}
