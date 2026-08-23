@@ -42,7 +42,7 @@ const skills = computed(() =>
 </script>
 
 <template>
-  <div class="panel">
+  <div class="panel ink-sheet">
     <header>
       <b>储物袋 · {{ realmLabel(player.level) }}</b>
       <nav>
@@ -73,8 +73,6 @@ const skills = computed(() =>
   inset: auto 0 0 0;
   max-height: 62vh;
   overflow: auto;
-  background: rgba(20, 14, 9, 0.96);
-  border-top: 1px solid #8b6914;
   color: #e8dcc0;
   padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
 }
@@ -83,6 +81,11 @@ header {
   align-items: center;
   gap: 12px;
   margin-bottom: 10px;
+}
+header b {
+  font-family: var(--font-display);
+  font-size: 15px;
+  letter-spacing: 0.2em;
 }
 nav {
   flex: 1;

@@ -58,6 +58,11 @@ const ITEM_BOOK: Record<string, Item> = Object.fromEntries(
 )
 
 const FLOATER_LIFE_MS = 900
+const PROJECTILE_MS = 500
+const SELF_GLOW_MS = 300
+const BURST_MS = 430
+const FLASH_MS = 320
+const SHAKE_MS = 360
 
 const active = ref(false)
 const state = ref<BattleState | null>(null)
@@ -72,6 +77,37 @@ interface Floater {
 }
 const floaters = ref<Floater[]>([])
 let floaterSeq = 0
+
+// ==== gfx-battle-ui：战斗演出状态（弹道/命中反馈）====
+const busy = ref(false)
+const firing = ref(false)
+const bursting = ref(false)
+const selfGlow = ref(false)
+const foeFlash = ref(false)
+const selfFlash = ref(false)
+const shaking = ref(false)
+let fxTimers: number[] = []
+
+function later(ms: number, fn: () => void): void {
+  fxTimers.push(window.setTimeout(fn, ms))
+}
+
+function clearFxTimers(): void {
+  fxTimers.forEach((t) => window.clearTimeout(t))
+  fxTimers = []
+}
+
+onUnmounted(() => {
+  clearFxTimers()
+})
+
+function hitFeedback(target: 'foe' | 'self'): void {
+  shaking.value = true
+  later(SHAKE_MS, () => (shaking.value = false))
+  const flag = target === 'foe' ? foeFlash : selfFlash
+  flag.value = true
+  later(FLASH_MS, () => (flag.value = false))
+}
 
 const learnedSkills = computed(() =>
   player.value.skills.map((id) => SKILL_BOOK[id]).filter((s): s is Skill => Boolean(s)),
@@ -100,6 +136,10 @@ const unsubStart = bus.on('battle:start', ({ enemyId }) => {
   victory.value = null
   defeated.value = false
   floaters.value = []
+  clearFxTimers()
+  busy.value = false
+  firing.value = false
+  bursting.value = false
   active.value = true
 })
 onUnmounted(() => {
@@ -109,8 +149,14 @@ onUnmounted(() => {
 
 function spawnFloaters(prev: BattleState | null, next: BattleState): void {
   if (!prev) return
-  if (next.enemy.hp < prev.enemy.hp) pushFloater(`-${prev.enemy.hp - next.enemy.hp}`, 'foe')
-  if (next.player.hp < prev.player.hp) pushFloater(`-${prev.player.hp - next.player.hp}`, 'self')
+  if (next.enemy.hp < prev.enemy.hp) {
+    pushFloater(`-${prev.enemy.hp - next.enemy.hp}`, 'foe')
+    hitFeedback('foe')
+  }
+  if (next.player.hp < prev.player.hp) {
+    pushFloater(`-${prev.player.hp - next.player.hp}`, 'self')
+    hitFeedback('self')
+  }
   if (next.player.hp > prev.player.hp) pushFloater(`+${next.player.hp - prev.player.hp}`, 'heal')
 }
 
@@ -152,7 +198,7 @@ let playerBeforeLevel = 1
 
 function act(action: 'attack' | 'flee'): void {
   const cur = state.value
-  if (!cur || cur.over) return
+  if (!cur || cur.over || busy.value) return
   playerBeforeLevel = getPlayer().level
   const raw = toRaw(cur)
   if (action === 'attack') apply(playerAttack(raw))
@@ -162,15 +208,36 @@ function act(action: 'attack' | 'flee'): void {
 function cast(skillId: string): void {
   const cur = state.value
   const skill = SKILL_BOOK[skillId]
-  if (!cur || cur.over || !skill) return
+  if (!cur || cur.over || !skill || busy.value) return
   playerBeforeLevel = getPlayer().level
-  apply(castSkill(toRaw(cur), skill))
+  busy.value = true
+  submenu.value = 'none'
+  const raw = toRaw(cur)
+  if (skillEffect(skill).kind === 'damage') {
+    firing.value = true
+    later(PROJECTILE_MS, () => {
+      firing.value = false
+      bursting.value = true
+      apply(castSkill(raw, skill))
+      later(BURST_MS, () => {
+        bursting.value = false
+        busy.value = false
+      })
+    })
+  } else {
+    selfGlow.value = true
+    later(SELF_GLOW_MS, () => {
+      selfGlow.value = false
+      apply(castSkill(raw, skill))
+      busy.value = false
+    })
+  }
 }
 
 function useBattleItem(itemId: string): void {
   const cur = state.value
   const item = ITEM_BOOK[itemId]
-  if (!cur || cur.over || !item) return
+  if (!cur || cur.over || !item || busy.value) return
   if ((getPlayer().inventory[itemId] ?? 0) <= 0) return
   playerBeforeLevel = getPlayer().level
   updatePlayer((p) => removeItem(p, itemId))
@@ -179,7 +246,7 @@ function useBattleItem(itemId: string): void {
 
 function close(): void {
   const cur = state.value
-  if (!cur) return
+  if (!cur || busy.value) return
   // 战败惩罚（气血折半+回出生点）由世界层在 battle:end 中统一处理
   bus.emit('battle:end', { win: cur.win, fled: cur.fled, enemyId: battleEnemyId })
   active.value = false
@@ -187,6 +254,7 @@ function close(): void {
 }
 
 function toggle(menu: 'skill' | 'item'): void {
+  if (busy.value) return
   submenu.value = submenu.value === menu ? 'none' : menu
 }
 
@@ -197,8 +265,15 @@ function pct(v: number, max: number): string {
 
 <template>
   <div v-if="active && state" class="overlay">
-    <div class="panel">
-      <div class="row">
+    <div class="wash" />
+    <div class="panel ink-frame" :class="{ shaking }">
+      <div class="fx-layer">
+        <span v-if="selfGlow" class="self-glow" />
+        <span v-if="firing" class="projectile"><i /></span>
+        <span v-if="bursting" class="burst"><i v-for="n in 8" :key="n" /></span>
+      </div>
+
+      <div class="row" :class="{ hitflash: selfFlash || selfGlow }">
         <span class="who self">{{ state.player.name }} · {{ realmLabel(player.level) }}</span>
         <div class="bars">
           <div class="bar"><i class="hp" :style="{ width: pct(state.player.hp, state.player.maxHp) }" /></div>
@@ -207,7 +282,7 @@ function pct(v: number, max: number): string {
         <span class="num">{{ state.player.hp }}/{{ state.player.maxHp }}</span>
       </div>
 
-      <div class="row foe-row">
+      <div class="row foe-row" :class="{ hitflash: foeFlash }">
         <span class="who">{{ state.enemy.name }}</span>
         <div class="bars">
           <div class="bar"><i class="foe" :style="{ width: pct(state.enemy.hp, state.enemy.maxHp) }" /></div>
@@ -221,8 +296,7 @@ function pct(v: number, max: number): string {
           v-for="f in floaters"
           :key="f.id"
           class="floater"
-          :class="f.cls"
-          :style="{ animationDelay: '0s' }"
+          :class="[f.cls, { big: f.cls !== 'heal' }]"
           >{{ f.text }}</span
         >
       </div>
@@ -271,12 +345,12 @@ function pct(v: number, max: number): string {
           </p>
           <p v-if="victory.loot.length > 0">战利品：{{ victory.loot.join('、') }}</p>
           <p v-else class="dim">未获战利品</p>
-          <button @click="close">继续</button>
+          <button class="ink-btn" @click="close">继续</button>
         </div>
         <div v-else-if="defeated" class="verdict lose">
           <p class="title">败 · 重伤昏厥</p>
           <p>醒来时已被送回原地，气血折半——留得性命，来日方长。</p>
-          <button @click="close">回到出生点</button>
+          <button class="ink-btn" @click="close">回到出生点</button>
         </div>
         <div v-else class="actions">
           <button @click="close">离开战斗</button>
@@ -293,26 +367,211 @@ function pct(v: number, max: number): string {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.45);
   z-index: 10;
+  background: rgba(10, 7, 4, 0.35);
+  backdrop-filter: blur(5px) saturate(0.85);
+  -webkit-backdrop-filter: blur(5px) saturate(0.85);
+}
+.wash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 36%, rgba(46, 32, 18, 0.28), rgba(10, 7, 4, 0.62) 74%),
+    repeating-radial-gradient(ellipse at 16% 84%, transparent 0 34px, rgba(232, 220, 192, 0.02) 34px 37px),
+    repeating-linear-gradient(112deg, transparent 0 46px, rgba(210, 190, 150, 0.025) 46px 49px);
 }
 .panel {
-  position: relative;
   width: min(92vw, 440px);
-  background: rgba(26, 18, 11, 0.95);
-  border: 1px solid #8b6914;
-  border-radius: 12px;
   padding: 16px;
-  color: #e8dcc0;
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+.panel.shaking {
+  animation: panel-shake 360ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+@keyframes panel-shake {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0);
+  }
+  15% {
+    transform: translate(-6px, 2px) rotate(-0.4deg);
+  }
+  32% {
+    transform: translate(5px, -3px) rotate(0.35deg);
+  }
+  50% {
+    transform: translate(-4px, 1px) rotate(-0.25deg);
+  }
+  68% {
+    transform: translate(3px, -1px) rotate(0.15deg);
+  }
+  84% {
+    transform: translate(-2px, 1px);
+  }
+}
+.fx-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 12px;
+  z-index: 3;
+}
+.self-glow {
+  position: absolute;
+  left: 8%;
+  top: 6%;
+  width: 90px;
+  height: 60px;
+  background: radial-gradient(ellipse at center, rgba(140, 235, 160, 0.4), transparent 70%);
+  animation: glow-pulse 300ms ease-out forwards;
+}
+@keyframes glow-pulse {
+  from {
+    opacity: 1;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+.projectile {
+  position: absolute;
+  left: 16%;
+  top: 76%;
+}
+.projectile i {
+  position: absolute;
+  display: block;
+  margin: -9px 0 0 -9px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff6d8, #ffb84a 55%, #e2571e);
+  box-shadow:
+    0 0 12px 4px rgba(255, 150, 60, 0.6),
+    0 0 30px 10px rgba(255, 110, 40, 0.25);
+  animation: bolt-fly 500ms cubic-bezier(0.3, 0, 0.75, 0.6) forwards;
+}
+@keyframes bolt-fly {
+  0% {
+    left: 16%;
+    top: 76%;
+    transform: scale(0.65);
+    opacity: 0.85;
+  }
+  45% {
+    left: 48%;
+    top: 42%;
+  }
+  100% {
+    left: 82%;
+    top: 17%;
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+.burst {
+  position: absolute;
+  left: 82%;
+  top: 17%;
+}
+.burst::before {
+  content: '';
+  position: absolute;
+  left: -21px;
+  top: -21px;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 217, 122, 0.85);
+  animation: ring-out 420ms ease-out forwards;
+}
+@keyframes ring-out {
+  from {
+    transform: scale(0.3);
+    opacity: 1;
+  }
+  to {
+    transform: scale(2.1);
+    opacity: 0;
+  }
+}
+.burst i {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffe9b0, #ff9636);
+  animation: shard 420ms ease-out forwards;
+}
+.burst i:nth-child(1) {
+  --dx: 30px;
+  --dy: -20px;
+}
+.burst i:nth-child(2) {
+  --dx: 8px;
+  --dy: -32px;
+}
+.burst i:nth-child(3) {
+  --dx: -24px;
+  --dy: -22px;
+}
+.burst i:nth-child(4) {
+  --dx: -34px;
+  --dy: 4px;
+}
+.burst i:nth-child(5) {
+  --dx: -18px;
+  --dy: 28px;
+}
+.burst i:nth-child(6) {
+  --dx: 12px;
+  --dy: 32px;
+}
+.burst i:nth-child(7) {
+  --dx: 32px;
+  --dy: 14px;
+}
+.burst i:nth-child(8) {
+  --dx: 2px;
+  --dy: -6px;
+}
+@keyframes shard {
+  from {
+    transform: translate(0, 0) scale(1.3);
+    opacity: 1;
+  }
+  to {
+    transform: translate(var(--dx), var(--dy)) scale(0.15);
+    opacity: 0;
+  }
 }
 .row {
   display: flex;
   align-items: center;
   gap: 10px;
   font-size: 13px;
+  padding: 2px 3px;
+  border-radius: 6px;
+}
+.row.hitflash {
+  animation: hit-flash 320ms steps(2, jump-none);
+}
+@keyframes hit-flash {
+  0%,
+  100% {
+    filter: brightness(1);
+    background: transparent;
+  }
+  30% {
+    filter: brightness(2.4);
+    background: rgba(255, 255, 255, 0.14);
+  }
 }
 .who {
   width: 110px;
@@ -320,6 +579,8 @@ function pct(v: number, max: number): string {
 }
 .who.self {
   color: #ffd97a;
+  font-family: var(--font-display);
+  letter-spacing: 0.06em;
 }
 .bars {
   flex: 1;
@@ -359,7 +620,7 @@ function pct(v: number, max: number): string {
 }
 .stage {
   position: relative;
-  height: 26px;
+  height: 30px;
 }
 .floater {
   position: absolute;
@@ -367,7 +628,12 @@ function pct(v: number, max: number): string {
   top: 0;
   font-weight: bold;
   font-size: 16px;
-  animation: rise 0.9s ease-out forwards;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  animation: rise-pop 0.9s ease-out forwards;
+}
+.floater.big {
+  font-family: var(--font-display);
+  font-size: 24px;
 }
 .floater.self {
   color: #ff8a7a;
@@ -378,13 +644,20 @@ function pct(v: number, max: number): string {
 .floater.heal {
   color: #8fe89a;
 }
-@keyframes rise {
-  from {
-    transform: translate(-50%, 0);
+@keyframes rise-pop {
+  0% {
+    transform: translate(-50%, 4px) scale(2);
+    opacity: 0;
+  }
+  14% {
+    transform: translate(-50%, 0) scale(1.35);
     opacity: 1;
   }
-  to {
-    transform: translate(-50%, -22px);
+  34% {
+    transform: translate(-50%, -8px) scale(1);
+  }
+  100% {
+    transform: translate(-50%, -26px) scale(0.92);
     opacity: 0;
   }
 }
@@ -396,6 +669,7 @@ function pct(v: number, max: number): string {
   padding: 8px 10px;
   font-size: 12px;
   line-height: 1.7;
+  background: rgba(0, 0, 0, 0.25);
 }
 .log p {
   margin: 0;
@@ -457,11 +731,13 @@ function pct(v: number, max: number): string {
   gap: 6px;
 }
 .verdict .title {
-  font-size: 17px;
-  letter-spacing: 4px;
+  font-family: var(--font-display);
+  font-size: 19px;
+  letter-spacing: 6px;
 }
 .verdict.win .title {
   color: #ffd97a;
+  text-shadow: 0 0 14px rgba(255, 217, 122, 0.35);
 }
 .verdict.lose .title {
   color: #e88a7a;
@@ -475,10 +751,6 @@ function pct(v: number, max: number): string {
 }
 .verdict button {
   min-height: 44px;
-  border: 1px solid #8b6914;
-  border-radius: 8px;
-  background: rgba(58, 42, 24, 0.85);
-  color: #e8dcc0;
   font-size: 14px;
 }
 </style>

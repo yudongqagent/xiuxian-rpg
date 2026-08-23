@@ -39,6 +39,8 @@ import {
   bakeTerrainBlend,
   placeProps,
 } from './sceneScene'
+// ==== gfx-battle-ui ====
+import { attachHeroPolish, attachNpcLife } from './heroPolish'
 
 const TILE = 32
 const PLAYER_SPEED = 160
@@ -130,6 +132,8 @@ export class WorldScene extends Phaser.Scene {
     if (!this.anims.exists('walk-up')) mkWalk('walk-up', 1)
     if (!this.anims.exists('walk-side')) mkWalk('walk-side', 2)
     this.heroDust = attachHeroDust(this, this.player)
+    // ==== gfx-battle-ui：主角呼吸帧与方向性柔影（GFX2-A2）====
+    attachHeroPolish(this, this.player)
 
     this.player.setCollideWorldBounds(true)
     this.physics.world.setBounds(0, 0, this.gameMap.width * TILE, this.gameMap.height * TILE)
@@ -315,6 +319,8 @@ export class WorldScene extends Phaser.Scene {
       sprite.on('pointerdown', () => this.tryInteract())
       this.npcs.push({ id: npcId, sprite })
     })
+    // ==== gfx-battle-ui：NPC 待机动作池 + 对话面向玩家（GFX2-A3）====
+    attachNpcLife(this, this.npcs.map((n) => n.sprite))
   }
 
   /** 妖兽：按 DSL 出生点游荡，越界则折返 */
