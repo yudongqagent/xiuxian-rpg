@@ -729,6 +729,23 @@ function pct(v: number, max: number): string {
 .menu button:disabled {
   opacity: 0.4;
 }
+.combo-hint {
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+  color: #ffd97a;
+  text-shadow: 0 0 8px rgba(255, 217, 122, 0.6);
+  animation: comboPulse 1.1s ease-in-out infinite;
+}
+@keyframes comboPulse {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
 .menu .back {
   max-width: 80px;
 }

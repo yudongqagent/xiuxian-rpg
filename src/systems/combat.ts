@@ -30,6 +30,7 @@ export const GRADE_POWER: Record<GongfaGradeValue, number> = {
 
 const DAMAGE_VARIANCE = 0.15
 const MIN_DAMAGE = 1
+const COMBO_MULTIPLIER = 1.5
 const FLEE_BASE_CHANCE = 0.6
 const FLEE_SPEED_BONUS = 0.05
 const FLEE_MIN_CHANCE = 0.2
@@ -59,6 +60,7 @@ export const LOG = {
   battleStart: (player: string, enemy: string) => `${player}与${enemy}对峙，战斗开始`,
   playerHit: (enemy: string, dmg: number) => `你挥剑击中${enemy}，造成${dmg}点伤害`,
   skillCast: (name: string, dmg: number) => `${name}灵光大盛，轰出${dmg}点伤害`,
+  comboCast: (skillName: string, dmg: number) => `连携！${skillName}威力大增，造成${dmg}点伤害`,
   skillHeal: (name: string, amount: number) => `${name}运转周天，回复${amount}点气血`,
   skillBuff: (name: string, amount: number, turns: number) =>
     `${name}灵光护体，攻击提升${amount}点，持续${turns}回合`,
@@ -104,6 +106,8 @@ export interface BattleState {
   enemy: EnemyCombatant
   turn: number
   log: LogEntry[]
+  /** CBT-8：玩家上一手动作（连携判定用） */
+  lastAction?: 'attack' | 'skill' | 'item' | 'flee' | null
   over: boolean
   win: boolean
   fled: boolean
@@ -307,6 +311,7 @@ function resolveRound(state: BattleState, rng: Rng): BattleState {
 export function playerAttack(state: BattleState, rng: Rng = Math.random): BattleState {
   if (state.over) return state
   const next = structuredClone(state)
+  next.lastAction = 'attack'
   const dmg = rollDamage(effectiveAtk(next.player), next.enemy.def, 1, rng)
   next.enemy.hp = Math.max(0, next.enemy.hp - dmg)
   next.log.push({ text: LOG.playerHit(next.enemy.name, dmg), kind: 'player' })
@@ -324,10 +329,17 @@ export function castSkill(state: BattleState, skill: Skill, rng: Rng = Math.rand
     return resolveRound(next, rng)
   }
   next.player.qi -= effect.cost
+  const combo = next.lastAction === 'attack' && effect.kind === 'damage'
+  next.lastAction = 'skill'
   if (effect.kind === 'damage') {
-    const dmg = rollDamage(effectiveAtk(next.player), next.enemy.def, effect.power ?? 1, rng)
+    const power = (effect.power ?? 1) * (combo ? COMBO_MULTIPLIER : 1)
+    const dmg = rollDamage(effectiveAtk(next.player), next.enemy.def, power, rng)
     next.enemy.hp = Math.max(0, next.enemy.hp - dmg)
-    next.log.push({ text: LOG.skillCast(skill.name, dmg), kind: 'player' })
+    next.log.push(
+      combo
+        ? { text: LOG.comboCast(skill.name, dmg), kind: 'player' }
+        : { text: LOG.skillCast(skill.name, dmg), kind: 'player' },
+    )
     if (checkVictory(next)) return next
   } else if (effect.kind === 'heal') {
     const amount = effect.amount ?? 0
@@ -348,6 +360,7 @@ export function castSkill(state: BattleState, skill: Skill, rng: Rng = Math.rand
 export function useItem(state: BattleState, item: Item, rng: Rng = Math.random): BattleState {
   if (state.over) return state
   const next = structuredClone(state)
+  next.lastAction = 'item'
   const eff = item.effect ?? {}
   if (eff.hp) next.player.hp = Math.min(next.player.maxHp, next.player.hp + eff.hp)
   if (eff.qi) next.player.qi = Math.min(next.player.maxQi, next.player.qi + eff.qi)
@@ -364,6 +377,7 @@ export function fleeChance(state: BattleState): number {
 export function attemptFlee(state: BattleState, rng: Rng = Math.random): BattleState {
   if (state.over) return state
   const next = structuredClone(state)
+  next.lastAction = 'flee'
   if (rng() < fleeChance(state)) {
     next.over = true
     next.fled = true

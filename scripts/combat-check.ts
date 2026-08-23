@@ -422,6 +422,28 @@ expect('玩家攻击锚点为10', PLAYER_BASE_STATS.atk === 10)
   expect('卖出已装备武器自动卸下', armed.equipped.weapon === null && armed.lingshi === 5)
 }
 
+// ===== CBT-8：连携技 =====
+{
+  const base = createBattle(wolf, { stats: statsForLevel(1), hp: 50, qi: 40 })
+  // 攻→法术 = 连携：伤害显著高于裸法术
+  const afterAtk = playerAttack(base, () => 0.5)
+  const comboState = castSkill(afterAtk, huodanShu, () => 0.5)
+  const plainState = castSkill(base, huodanShu, () => 0.5)
+  const comboDmg = base.enemy.hp - comboState.enemy.hp
+  const plainDmg = base.enemy.hp - plainState.enemy.hp
+  expect('连携法术伤害高于裸放', comboDmg > plainDmg)
+  expect('连携日志出现', comboState.log.some((l) => l.text.includes('连携')))
+  expect('裸放无连携日志', !plainState.log.some((l) => l.text.includes('连携')))
+  // 物品/逃跑打断连携
+  const huiqiSan = ItemSchema.parse({
+    id: 'huiqi_san', name: '回气散', type: 'consumable', grade: '凡品', description: '', effect: { qi: 20 },
+  })
+  const viaItem = castSkill(useItem(afterAtk, huiqiSan, () => 0.5), huodanShu, () => 0.5)
+  expect('用物品打断连携', !viaItem.log.some((l) => l.text.includes('连携')))
+  // 治疗类技能不吃连携倍率但记录动作
+  expect('连携后 lastAction=skill', comboState.lastAction === 'skill')
+}
+
 if (failures > 0) {
   console.error(`\n${failures} 项检查未通过`)
   process.exit(1)
