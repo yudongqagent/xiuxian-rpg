@@ -333,7 +333,6 @@ export class WorldScene extends Phaser.Scene {
       }),
     )
   }
-  }
 
   update(): void {
     if (!this.ready || !this.player?.body || this.transitioning) return
