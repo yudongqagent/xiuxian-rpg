@@ -85,7 +85,10 @@ const battleItems = computed(() =>
 const victory = ref<{ exp: number; loot: string[]; levelsGained: number; realmBefore: string } | null>(null)
 const defeated = ref(false)
 
+let battleEnemyId: string | undefined
+
 const unsubStart = bus.on('battle:start', ({ enemyId }) => {
+  battleEnemyId = enemyId
   const template = ENEMY_TEMPLATES[enemyId]
   if (!template) throw new Error(`未知妖兽: ${enemyId}`)
   const p = getPlayer()
@@ -178,7 +181,7 @@ function close(): void {
   const cur = state.value
   if (!cur) return
   // 战败惩罚（气血折半+回出生点）由世界层在 battle:end 中统一处理
-  bus.emit('battle:end', { win: cur.win, fled: cur.fled })
+  bus.emit('battle:end', { win: cur.win, fled: cur.fled, enemyId: battleEnemyId })
   active.value = false
   state.value = null
 }
