@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { bus } from '../engine/eventBus'
-import { listSaves, MANUAL_SLOTS, type SaveData } from '../engine/save'
+import { exportSaveCode, importSaveCode, listSaves, MANUAL_SLOTS, type SaveData } from '../engine/save'
 import { getPlayer, realmLabel } from '../systems/player'
 import { getGameMap, DEFAULT_MAP_ID } from '../systems/maps'
 
@@ -14,6 +14,9 @@ interface Row {
 }
 
 const rows = ref<Row[]>([])
+const codeText = ref('')
+const importSlot = ref('s3')
+const importMsg = ref('')
 
 async function refresh(): Promise<void> {
   const all = await listSaves()
@@ -33,6 +36,22 @@ function meta(d: SaveData): string {
     /* 未知地图回退 id */
   }
   return `${time} · ${realm} · ${mapName}`
+}
+
+async function exportCode(slot: string): Promise<void> {
+  const code = await exportSaveCode(slot as 's1' | 's2' | 's3')
+  if (!code) {
+    importMsg.value = '该档位为空，无法导出'
+    return
+  }
+  codeText.value = code
+  importMsg.value = `已导出 ${slot} 存档码（${code.length} 字符），全选复制分享`
+}
+
+async function importCode(): Promise<void> {
+  const ok = await importSaveCode(codeText.value, importSlot.value as 's1' | 's2' | 's3')
+  importMsg.value = ok ? `已导入到 ${importSlot.value}` : '存档码无效（格式或校验失败）'
+  if (ok) await refresh()
 }
 
 function save(slot: string): void {
@@ -63,13 +82,69 @@ onMounted(() => void refresh())
       <template v-if="r.slot !== 'auto'">
         <button class="ink-btn" @click="save(r.slot)">保存</button>
         <button class="ink-btn" :disabled="!r.data" @click="load(r.slot)">读取</button>
+        <button v-if="r.slot !== 'auto'" class="ink-btn small" :disabled="!r.data" @click="exportCode(r.slot)">导出码</button>
       </template>
       <span v-else class="auto-tag">自动</span>
     </div>
     <p class="hint">自动存档每 5 秒写入；手动档可随时覆盖。</p>
+    <div class="xcode">
+      <textarea
+        v-model="codeText"
+        placeholder="在此粘贴或导出生成存档码"
+        spellcheck="false"
+      />
+      <div class="xops">
+        <select v-model="importSlot">
+          <option value="s1">导入到 手动档1</option>
+          <option value="s2">导入到 手动档2</option>
+          <option value="s3">导入到 手动档3</option>
+        </select>
+        <button class="ink-btn" @click="importCode">导入</button>
+        <span class="msg">{{ importMsg }}</span>
+      </div>
+    </div>
   </div>
 </template>
 
+<style scoped>
+.xcode {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.xcode textarea {
+  width: 100%;
+  height: 64px;
+  resize: none;
+  border: 1px solid rgba(139, 105, 20, 0.5);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #e8dcc0;
+  font-size: 11px;
+  padding: 8px;
+}
+.xops {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.xops select {
+  border: 1px solid #8b6914;
+  border-radius: 6px;
+  background: rgba(26, 18, 11, 0.85);
+  color: #e8dcc0;
+  padding: 6px;
+}
+.msg {
+  opacity: 0.75;
+  font-size: 11px;
+}
+.small {
+  min-height: 32px;
+}
+</style>
 <style scoped>
 .panel {
   position: fixed;

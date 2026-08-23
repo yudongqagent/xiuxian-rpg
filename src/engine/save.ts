@@ -69,6 +69,64 @@ export async function writeSave(data: SaveData, slot: SlotId = AUTO_SLOT): Promi
   }
 }
 
+// ===== ENG-6：存档码导出/导入（纯编解码，便于测试） =====
+
+const CODE_PREFIX = 'XJ1'
+
+function djb2Hex(input: string): string {
+  let h = 5381
+  for (let i = 0; i < input.length; i++) h = ((h << 5) + h + input.charCodeAt(i)) | 0
+  return (h >>> 0).toString(16).padStart(8, '0')
+}
+
+function toB64(json: string): string {
+  const bytes = new TextEncoder().encode(json)
+  let bin = ''
+  for (const b of bytes) bin += String.fromCharCode(b)
+  return btoa(bin)
+}
+
+function fromB64(b64: string): string {
+  const bin = atob(b64)
+  const bytes = Uint8Array.from(bin, (ch) => ch.charCodeAt(0))
+  return new TextDecoder().decode(bytes)
+}
+
+/** 序列化为可分享的存档码：XJ1.<base64>.<校验> */
+export function encodeSave(data: SaveData): string {
+  const json = JSON.stringify(data)
+  return `${CODE_PREFIX}.${toB64(json)}.${djb2Hex(json)}`
+}
+
+/** 解析存档码；格式或校验失败返回 null（不抛错） */
+export function decodeSave(code: string): SaveData | null {
+  try {
+    const parts = code.trim().split('.')
+    if (parts.length !== 3 || parts[0] !== CODE_PREFIX) return null
+    const json = fromB64(parts[1])
+    if (djb2Hex(json) !== parts[2]) return null
+    const data = JSON.parse(json) as SaveData
+    if (typeof data?.x !== 'number' || typeof data?.y !== 'number') return null
+    return data
+  } catch {
+    return null
+  }
+}
+
+/** 导出指定档位为存档码 */
+export async function exportSaveCode(slot: SlotId): Promise<string | null> {
+  const data = await loadSave(slot)
+  return data ? encodeSave(data) : null
+}
+
+/** 将存档码写入指定档位；成功返回 true */
+export async function importSaveCode(code: string, slot: SlotId): Promise<boolean> {
+  const data = decodeSave(code)
+  if (!data) return false
+  await writeSave(data, slot)
+  return true
+}
+
 export async function listSaves(): Promise<Record<string, SaveData | null>> {
   const out: Record<string, SaveData | null> = { [AUTO_SLOT]: null, s1: null, s2: null, s3: null }
   try {

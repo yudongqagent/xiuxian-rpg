@@ -32,7 +32,7 @@
 | ENG-3 | IndexedDB 存档 + 5s 自动保存 + 启动恢复 | M0 | ✅ | G4/G5 | main |
 | ENG-4 | 存档向后兼容扩展（mapId / player 成长字段） | M1 | 🚧 world-maps + combat-depth | G3/G4 | 两分支均 additive 可选字段 |
 | ENG-5 | 多存档位 ×3 + 手动存档 UI（存档面板/读取淡入恢复） | M2 | ✅（提前交付） | G4 | feat-saves：s1-s3 保存/读取 E2E 实测，meta 含时间·境界·地图 |
-| ENG-6 | 导出存档码 / 导入 | M2 | ⬜ | G4 | — |
+| ENG-6 | 导出存档码 / 导入（XJ1 三段式 + djb2 校验，防篡改） | M2 | ✅（提前交付） | G3/G4 | feat-savecode：编解码单测 5 项 + E2E 导出/篡改拒绝/导入实测 |
 | ENG-7 | PWA（离线缓存、添加到主屏） | M4 | ⬜ | G6 | — |
 
 ### B. 图形与表现层 `src/scenes/` `src/systems/mapTiles*`
@@ -172,6 +172,8 @@
 | 2026-08-22 | feat-saves：ENG-5 三手动档+存档面板；PT-9 相机铺满修复 | 已发布 |
 
 | 2026-08-22 | feat-equip：INV-3 装备系统落地（含起始铁剑教学），战斗/HUD/背包全链路接入 | 已发布 |
+
+| 2026-08-22 | feat-savecode：ENG-6 存档码导出/导入落地（面板导出码+按档位导入，校验防篡改） | 已发布 |
 
 > 集成约定：功能分支一律从最新 main 切出；集成在 release-* 工作树完成，冲突解决后跑满 G1–G4 再快进 main 发布。
 

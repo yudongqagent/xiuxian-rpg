@@ -36,6 +36,7 @@ import {
 } from '../src/systems/player'
 import type { Enemy, Item } from '../src/systems/schemas'
 import { ItemSchema, SkillSchema } from '../src/systems/schemas'
+import { decodeSave, encodeSave, type SaveData } from '../src/engine/save'
 import huodanShuJson from '../content/skills/huodan_shu.json'
 import changchunGongJson from '../content/skills/changchun_gong.json'
 import zhayanJianfaJson from '../content/skills/zhayan_jianfa.json'
@@ -340,6 +341,33 @@ expect('玩家攻击锚点为10', PLAYER_BASE_STATS.atk === 10)
   expect('存档往返保留装备', saved.equipped.weapon === 'tie_jian')
   const legacy = fromPlayerSave(undefined)
   expect('旧档装备缺省为空', legacy.equipped.weapon === null && legacy.equipped.armor === null)
+}
+
+// ===== ENG-6：存档码编解码 =====
+{
+  const sample: SaveData = {
+    version: 2,
+    playerId: 'mortal-001',
+    x: 640,
+    y: 896,
+    mapId: 'shanji',
+    inventory: [],
+    savedAt: 1755800000000,
+    player: { level: 3, exp: 12, hp: 61, qi: 48, inventory: { tie_jian: 1 }, skills: ['huodan_shu'], equipped: { weapon: 'tie_jian', armor: null } },
+    quests: { active: [{ id: 'qm_01_rumen', counts: [1, 0, 0] }], completed: [], failed: [], tracked: 'qm_01_rumen' },
+  }
+  const code = encodeSave(sample)
+  expect('存档码前缀与三段式', code.startsWith('XJ1.') && code.split('.').length === 3)
+  const back = decodeSave(code)
+  expect('存档码往返还原', back !== null && back.x === 640 && back.mapId === 'shanji')
+  expect(
+    '存档码保留成长/装备/任务',
+    back?.player?.level === 3 &&
+      back.player.equipped?.weapon === 'tie_jian' &&
+      back.quests?.tracked === 'qm_01_rumen',
+  )
+  expect('篡改校验失败', decodeSave(code.slice(0, -2) + 'zz') === null)
+  expect('非存档码返回 null', decodeSave('hello world') === null)
 }
 
 if (failures > 0) {
