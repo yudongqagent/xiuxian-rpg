@@ -95,7 +95,7 @@ const skills = computed(() =>
       >
         <i>{{ slot === 'weapon' ? '⚔' : '🛡' }}</i>
         <span>{{ slot === 'weapon' ? '武器' : '防具' }}：{{
-          slotItemId(slot) ? ITEM_BOOK[slotItemId(slot)!]?.name : '空（点击卸下）'
+          slotItemId(slot) ? `${ITEM_BOOK[slotItemId(slot)!]?.name}（点击卸下）` : '空'
         }}</span>
         <small v-if="slotItemId(slot)">
           {{ slot === 'weapon' ? `攻+${ITEM_BOOK[slotItemId(slot)!]?.stats?.atk ?? 0}` : `防+${ITEM_BOOK[slotItemId(slot)!]?.stats?.def ?? 0}` }}
