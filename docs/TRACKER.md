@@ -57,7 +57,7 @@
 | MAP-4 | 密林妖谷（妖兽区） | M1 | ✅ | G1/G4 | world-maps |
 | MAP-5 | portal 场景切换 + 出生点定位 + 存档恢复地图 | M1 | ✅ | G4 | qa-local 12/12 |
 | MAP-6 | Tiled 编辑器导入管线 | M1+ | ⬜（JSON DSL 先行替代） | G1 | — |
-| MAP-7 | 人界篇全域地图量产（10+ 区域） | M3 | ⬜（region 数据已有，地图待做） | G1/G4 | 31e3db3 提供 region |
+| MAP-7 | 人界篇全域地图量产（10+ 区域） | M3 | 🚧 ch3-4 maps delivered (huangfeng_gu/xuese_ta)，余区待做 | G1/G4 | maps-ch34（31e3db3 提供 region） |
 
 ### D. NPC 与对话 `src/systems/dialogues.ts` `src/ui/DialogueBox.vue`
 
