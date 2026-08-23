@@ -75,6 +75,11 @@ function drain(): void {
 function applyTriggerEvent(ev: QuestTrigger): void {
   const res = applyTrigger(allQuestRecord(), state, ev)
   state = res.state
+  // 任何有进展的任务都要广播状态，否则 HUD 追踪条/任务日志停留在旧文本
+  for (const questId of res.progressedQuestIds) {
+    if (res.readyToTurnInIds.includes(questId) || res.autoCompletedIds.includes(questId)) continue
+    emitUpdated(questId, 'active')
+  }
   for (const questId of res.stepCompletedIds) {
     if (!res.autoCompletedIds.includes(questId) && !res.readyToTurnInIds.includes(questId)) {
       const step = currentObjectiveLine(questId)

@@ -215,7 +215,16 @@ function act(action: 'attack' | 'flee'): void {
   playerBeforeLevel = getPlayer().level
   const raw = toRaw(cur)
   if (action === 'attack') apply(playerAttack(raw))
-  else apply(attemptFlee(raw))
+  else {
+    apply(attemptFlee(raw))
+    // 逃跑成功：短暂展示后自动收面板（PT-8）
+    const next = state.value
+    if (next && next.over && next.fled) {
+      window.setTimeout(() => {
+        if (state.value === next) close()
+      }, 700)
+    }
+  }
 }
 
 function cast(skillId: string): void {

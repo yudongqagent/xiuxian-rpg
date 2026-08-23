@@ -87,6 +87,7 @@ export class WorldScene extends Phaser.Scene {
   private heroDust: { setMoving: (moving: boolean) => void } | null = null
   private heroDir: 'down' | 'up' | 'side' = 'down'
   private treeSprites: Phaser.GameObjects.Image[] = []
+  private waterBlockers: Phaser.GameObjects.Rectangle[] = []
 
   constructor() {
     super('World')
@@ -139,6 +140,7 @@ export class WorldScene extends Phaser.Scene {
     this.player.setCollideWorldBounds(true)
     this.physics.world.setBounds(0, 0, this.gameMap.width * TILE, this.gameMap.height * TILE)
     this.physics.add.collider(this.player, this.obstacles)
+    this.physics.add.collider(this.player, this.waterBlockers)
     this.cameras.main.startFollow(this.player, true, 0.15, 0.15)
     this.cameras.main.setBounds(0, 0, this.gameMap.width * TILE, this.gameMap.height * TILE)
 
@@ -231,6 +233,17 @@ export class WorldScene extends Phaser.Scene {
     bus.emit('area:enter', { name: this.gameMap.name })
     this.ready = true
 
+    // PT-6：窗口失焦/切页时清空输入，防止按键状态残留
+    const clearInput = () => {
+      this.joyVec = { x: 0, y: 0 }
+      this.input.keyboard?.resetKeys()
+    }
+    window.addEventListener('blur', clearInput)
+    document.addEventListener('visibilitychange', clearInput)
+    this.events.once('shutdown', () => {
+      window.removeEventListener('blur', clearInput)
+      document.removeEventListener('visibilitychange', clearInput)
+    })
     this.events.on('shutdown', () => this.unsubs.forEach((u) => u()))
   }
 
@@ -258,6 +271,12 @@ export class WorldScene extends Phaser.Scene {
             break
           case '~':
             layer.putTileAt(FRAME.WATER, x, y)
+            {
+              const r = this.add.rectangle(cx, cy, TILE, TILE)
+              r.setVisible(false)
+              this.physics.add.existing(r, true)
+              this.waterBlockers.push(r)
+            }
             break
           case 'B':
             layer.putTileAt(FRAME.BRIDGE, x, y)
@@ -364,6 +383,7 @@ export class WorldScene extends Phaser.Scene {
       })
     })
     this.physics.add.collider(this.wolves, this.obstacles!)
+    this.physics.add.collider(this.wolves, this.waterBlockers)
     this.physics.add.collider(this.player!, this.wolves)
     this.physics.add.overlap(this.player!, this.wolves, (_p, wolfObj) => {
       const wolf = wolfObj as Phaser.Physics.Arcade.Sprite
@@ -442,9 +462,9 @@ export class WorldScene extends Phaser.Scene {
             // 逃跑：双方弹开，避免仍处重叠区立刻重入战斗
             const dir = new Phaser.Math.Vector2(this.player.x - enemy.x, this.player.y - enemy.y)
             if (dir.lengthSq() < 0.01) dir.set(Phaser.Math.Between(-1, 1), Phaser.Math.Between(-1, 1))
-            dir.normalize().scale(220)
+            dir.normalize().scale(140)
             this.player.setVelocity(dir.x, dir.y)
-            ;(enemy.body as Phaser.Physics.Arcade.Body).setVelocity(-dir.x * 0.6, -dir.y * 0.6)
+            ;(enemy.body as Phaser.Physics.Arcade.Body).setVelocity(-dir.x * 0.35, -dir.y * 0.35)
           }
           if (!fled) {
             // 战败（非逃跑）：宽惩罚——气血折半，送回出生点

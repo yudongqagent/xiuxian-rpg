@@ -90,12 +90,41 @@
       "x": 26,
       "y": 24,
       "radius": 112
+    },
+    {
+      "enemyId": "du_zhu",
+      "x": 7,
+      "y": 14,
+      "radius": 80
+    },
+    {
+      "enemyId": "du_zhu",
+      "x": 28,
+      "y": 13,
+      "radius": 80
     }
   ],
   "props": [
-    { "type": "signpost", "x": 16, "y": 1 },
-    { "type": "lantern", "x": 16, "y": 13 },
-    { "type": "lantern", "x": 20, "y": 13 },
-    { "type": "fence", "x": 32, "y": 15 }
-  ]
+    {
+      "type": "signpost",
+      "x": 16,
+      "y": 1
+    },
+    {
+      "type": "lantern",
+      "x": 16,
+      "y": 13
+    },
+    {
+      "type": "lantern",
+      "x": 20,
+      "y": 13
+    },
+    {
+      "type": "fence",
+      "x": 32,
+      "y": 15
+    }
+  ],
+  "enemySpowns": null
 }

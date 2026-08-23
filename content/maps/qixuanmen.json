@@ -69,14 +69,39 @@
       "npcId": "mo_caihuan",
       "x": 11,
       "y": 23
+    },
+    {
+      "npcId": "yue_tangzhu",
+      "x": 17,
+      "y": 14
     }
   ],
   "enemySpawns": [],
   "props": [
-    { "type": "lantern", "x": 15, "y": 15 },
-    { "type": "lantern", "x": 21, "y": 15 },
-    { "type": "well", "x": 14, "y": 17 },
-    { "type": "signpost", "x": 16, "y": 12 },
-    { "type": "stall", "x": 21, "y": 12 }
+    {
+      "type": "lantern",
+      "x": 15,
+      "y": 15
+    },
+    {
+      "type": "lantern",
+      "x": 21,
+      "y": 15
+    },
+    {
+      "type": "well",
+      "x": 14,
+      "y": 17
+    },
+    {
+      "type": "signpost",
+      "x": 16,
+      "y": 12
+    },
+    {
+      "type": "stall",
+      "x": 21,
+      "y": 12
+    }
   ]
 }

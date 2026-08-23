@@ -69,6 +69,7 @@ const skills = computed(() =>
 
 <style scoped>
 .panel {
+  z-index: 30;
   position: fixed;
   inset: auto 0 0 0;
   max-height: 62vh;
