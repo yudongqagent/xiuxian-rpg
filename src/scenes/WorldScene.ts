@@ -49,6 +49,7 @@ const ENEMY_WANDER_INTERVAL = 2000
 const INTERACT_RANGE = 80
 const FADE_MS = 350
 const SAVE_VERSION = 2
+const BATTLE_ACK_WATCHDOG_MS = 1500
 
 // ===================================================================
 // 多地图系统（world-maps 分支）：地图来自 content/maps/*.json DSL，
@@ -393,8 +394,16 @@ export class WorldScene extends Phaser.Scene {
       if (this.time.now < this.battleGraceUntil) return
       this.activeEnemy = wolf
       this.battleActive = true
+      this.battleAcked = false
       this.player!.setVelocity(0, 0)
       this.joyVec = { x: 0, y: 0 }
+      this.time.delayedCall(BATTLE_ACK_WATCHDOG_MS, () => {
+        if (this.battleActive && !this.battleAcked) {
+          console.error('[world] Battle UI did not open, watchdog force-unlocking')
+          this.battleActive = false
+          this.battleGraceUntil = this.time.now + 1000
+        }
+      })
       bus.emit('battle:start', { enemyId: wolf.getData('enemyId') as string })
     })
     this.physics.add.overlap(this.player!, this.portalZones.map((z) => z.zone), (_p, zObj) => {
@@ -443,17 +452,6 @@ export class WorldScene extends Phaser.Scene {
       // ENG-5：手动存/读档
       bus.on('save:write', ({ slot }) => void writeSave(this.snapshotSave(), slot as SlotId)),
       bus.on('save:load', ({ slot }) => void this.loadFromSlot(slot as SlotId)),
-      bus.on('battle:start', () => {
-        this.battleActive = true
-        this.battleAcked = false
-        this.time.delayedCall(1500, () => {
-          if (this.battleActive && !this.battleAcked) {
-            console.error('[world] 战斗 UI 未确认打开，看门狗强制解除锁定')
-            this.battleActive = false
-            this.battleGraceUntil = this.time.now + 1000
-          }
-        })
-      }),
       bus.on('battle:opened', () => (this.battleAcked = true)),
       bus.on('battle:end', ({ win, fled }) => {
         this.battleActive = false

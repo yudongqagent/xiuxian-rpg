@@ -63,7 +63,8 @@ function pctOf(v: number, max: number): string {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: calc(10px + env(safe-area-inset-top)) 14px 0;
+  padding: calc(10px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) 0
+    calc(14px + env(safe-area-inset-left));
   color: #e8dcc0;
   pointer-events: none;
 }
@@ -99,7 +100,7 @@ function pctOf(v: number, max: number): string {
 }
 .tracker {
   position: fixed;
-  left: 14px;
+  left: calc(14px + env(safe-area-inset-left));
   top: calc(52px + env(safe-area-inset-top));
   max-width: 60vw;
   display: flex;

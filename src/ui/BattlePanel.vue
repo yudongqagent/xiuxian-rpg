@@ -72,6 +72,8 @@ const SELF_GLOW_MS = 300
 const BURST_MS = 430
 const FLASH_MS = 320
 const SHAKE_MS = 360
+const ACTION_LOCK_MS = 480
+const ENEMY_BEAT_MS = 300
 
 const active = ref(false)
 const state = ref<BattleState | null>(null)
@@ -163,8 +165,10 @@ function spawnFloaters(prev: BattleState | null, next: BattleState): void {
     hitFeedback('foe')
   }
   if (next.player.hp < prev.player.hp) {
-    pushFloater(`-${prev.player.hp - next.player.hp}`, 'self')
-    hitFeedback('self')
+    later(ENEMY_BEAT_MS, () => {
+      pushFloater(`-${prev.player.hp - next.player.hp}`, 'self')
+      hitFeedback('self')
+    })
   }
   if (next.player.hp > prev.player.hp) pushFloater(`+${next.player.hp - prev.player.hp}`, 'heal')
 }
@@ -182,6 +186,7 @@ function apply(next: BattleState): void {
   spawnFloaters(prev, next)
   state.value = next
   submenu.value = 'none'
+  if (next.over) busy.value = false
   if (next.over && next.win && !victory.value) settleVictory(next)
   if (next.over && !next.win && !next.fled && !defeated.value) defeated.value = true
 }
@@ -209,6 +214,7 @@ function act(action: 'attack' | 'flee'): void {
   const cur = state.value
   if (!cur || cur.over || busy.value) return
   playerBeforeLevel = getPlayer().level
+  busy.value = true
   const raw = toRaw(cur)
   if (action === 'attack') apply(playerAttack(raw))
   else {
@@ -221,6 +227,7 @@ function act(action: 'attack' | 'flee'): void {
       }, 700)
     }
   }
+  window.setTimeout(() => (busy.value = false), ACTION_LOCK_MS)
 }
 
 function cast(skillId: string): void {
@@ -258,8 +265,10 @@ function useBattleItem(itemId: string): void {
   if (!cur || cur.over || !item || busy.value) return
   if ((getPlayer().inventory[itemId] ?? 0) <= 0) return
   playerBeforeLevel = getPlayer().level
+  busy.value = true
   updatePlayer((p) => removeItem(p, itemId))
   apply(useItem(toRaw(cur), item))
+  window.setTimeout(() => (busy.value = false), ACTION_LOCK_MS)
 }
 
 function close(): void {
@@ -346,10 +355,10 @@ function pct(v: number, max: number): string {
           <button class="back" @click="submenu = 'none'">返回</button>
         </div>
         <div v-else class="actions">
-          <button @click="act('attack')">攻击</button>
-          <button :disabled="learnedSkills.length === 0" @click="toggle('skill')">法术</button>
-          <button :disabled="battleItems.length === 0" @click="toggle('item')">丹药</button>
-          <button class="flee" @click="act('flee')">逃跑({{ Math.round(fleeChance(state) * 100) }}%)</button>
+          <button :disabled="busy" @click="act('attack')">攻击</button>
+          <button :disabled="busy || learnedSkills.length === 0" @click="toggle('skill')">法术</button>
+          <button :disabled="busy || battleItems.length === 0" @click="toggle('item')">丹药</button>
+          <button class="flee" :disabled="busy" @click="act('flee')">逃跑({{ Math.round(fleeChance(state) * 100) }}%)</button>
         </div>
       </template>
       <template v-else>
@@ -401,6 +410,8 @@ function pct(v: number, max: number): string {
 }
 .panel {
   width: min(92vw, 440px);
+  max-height: calc(100dvh - 20px);
+  overflow-y: auto;
   padding: 16px;
   display: flex;
   flex-direction: column;
