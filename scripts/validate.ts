@@ -169,6 +169,7 @@ function checkRefs() {
     for (const e of m.enemySpawns) {
       if (!enemyIds.has(e.enemyId)) refErr(`地图 ${mid}`, '妖兽', e.enemyId)
     }
+    if (m.regionId && !regionIds.has(m.regionId)) refErr(`地图 ${mid}`, '关联区域', m.regionId)
     for (const p of m.props ?? []) {
       if (!tileWalkable(m.rows, p.x, p.y)) {
         errors++

@@ -280,6 +280,8 @@ export const GameMapSchema = z
     npcPlacements: z.array(MapNpcPlacementSchema).max(20).default([]),
     enemySpawns: z.array(MapEnemySpawnSchema).max(20).default([]),
     props: z.array(MapPropSchema).max(40).default([]),
+    /** 可选：对应 content/world 区域 id，进入地图时随 area:enter 上报（任务 reach 目标用） */
+    regionId: z.string().regex(/^[a-z0-9_]+$/).optional(),
   })
   .superRefine((m, ctx) => {
     const w = m.rows[0]?.length ?? -1

@@ -179,6 +179,8 @@
 
 | 2026-08-22 | feat-shop：INV-5 坊市落地（灵石货币/买卖/商贩入村/面板互斥与 Esc）；修复对话无选项节点时商店按钮不显示 | 已发布 |
 
+| 2026-08-22 | feat-regions：地图 DSL 增加 regionId 并随 area:enter 上报——qm_02「抵达彩霞山脉」可达，主线第二章节链路打通；山道瀑布点亮 GFX2-B4 | 已发布 |
+
 > 集成约定：功能分支一律从最新 main 切出；集成在 release-* 工作树完成，冲突解决后跑满 G1–G4 再快进 main 发布。
 
 | 2026-08-22 | release-m1 集成四分支：world-maps→combat-depth→quest-engine→rich-graphics；修 5 处冲突 + 3 处集成缺陷（validate 地图块丢失、WorldScene 括号、area:enter 可选 regionId）；qa-local.mjs 入库并 12/12 通过 | 待发布 |

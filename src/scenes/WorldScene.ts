@@ -232,7 +232,7 @@ export class WorldScene extends Phaser.Scene {
     })
 
     this.cameras.main.fadeIn(FADE_MS, 0, 0, 0)
-    bus.emit('area:enter', { name: this.gameMap.name })
+    bus.emit('area:enter', { name: this.gameMap.name, regionId: this.gameMap.regionId })
     this.ready = true
 
     // PT-6：窗口失焦/切页时清空输入，防止按键状态残留
