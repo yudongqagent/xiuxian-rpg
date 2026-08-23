@@ -229,6 +229,15 @@ export const MapEnemySpawnSchema = z.object({
   radius: z.number().int().min(16).max(512).default(96),
 })
 
+// ==== gfx-scene：场景道具（B2）====
+export const PROP_TYPES = ['lantern', 'well', 'signpost', 'fence', 'stall'] as const
+
+export const MapPropSchema = z.object({
+  type: z.enum(PROP_TYPES),
+  x: z.number().int().min(0),
+  y: z.number().int().min(0),
+})
+
 export const GameMapSchema = z
   .object({
     id: z.string().regex(/^[a-z0-9_]+$/),
@@ -241,6 +250,7 @@ export const GameMapSchema = z
     portals: z.array(MapPortalSchema).max(12).default([]),
     npcPlacements: z.array(MapNpcPlacementSchema).max(20).default([]),
     enemySpawns: z.array(MapEnemySpawnSchema).max(20).default([]),
+    props: z.array(MapPropSchema).max(40).default([]),
   })
   .superRefine((m, ctx) => {
     const w = m.rows[0]?.length ?? -1
@@ -259,7 +269,7 @@ export const GameMapSchema = z
       }),
     )
     const inBounds = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < m.width && y < m.height
-    ;[m.spawn, ...m.portals.map((p) => ({ x: p.x, y: p.y })), ...m.npcPlacements].forEach((p) => {
+    ;[m.spawn, ...m.portals.map((p) => ({ x: p.x, y: p.y })), ...m.npcPlacements, ...m.props].forEach((p) => {
       if (!inBounds(p.x, p.y)) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: `坐标 (${p.x},${p.y}) 越界` })
       }

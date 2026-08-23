@@ -1,0 +1,55 @@
+{
+  "results": [
+    {
+      "name": "world-renders",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "C1 petals drifting (pixel diff)",
+      "pass": true,
+      "detail": "ratio=0.0084"
+    },
+    {
+      "name": "B3 parallax moves while walking (pixel diff)",
+      "pass": true,
+      "detail": "ratio=0.0369"
+    },
+    {
+      "name": "portal to shanji",
+      "pass": true,
+      "detail": "{\"x\":18,\"y\":2}"
+    },
+    {
+      "name": "B4 stream bands animate (pixel diff)",
+      "pass": true,
+      "detail": "ratio=0.1172"
+    },
+    {
+      "name": "C1 leaves tumbling (pixel diff)",
+      "pass": true,
+      "detail": "ratio=0.0101"
+    },
+    {
+      "name": "portal to yaogu",
+      "pass": true,
+      "detail": "{\"x\":2,\"y\":14}"
+    },
+    {
+      "name": "C1 fireflies+fog animate (pixel diff)",
+      "pass": true,
+      "detail": "ratio=0.0147"
+    },
+    {
+      "name": "C2 day-night drift (pixel diff)",
+      "pass": true,
+      "detail": "ratio=1.0000"
+    },
+    {
+      "name": "no page errors",
+      "pass": true,
+      "detail": ""
+    }
+  ],
+  "pageErrors": []
+}

@@ -204,8 +204,11 @@ export function enemyVisualFor(enemyId: string): { tex: string; scale: number; b
   return ENEMY_VISUALS[enemyId] ?? { tex: 'wolf', scale: 1, boss: false }
 }
 
-/** 全屏氛围：色调叠加 + 暗角 */
-export function applyAtmosphere(scene: Phaser.Scene, mapId: string): void {
+/** 全屏氛围：色调叠加 + 暗角；返回色调层句柄供 gfx-scene 昼夜循环调制 */
+export function applyAtmosphere(
+  scene: Phaser.Scene,
+  mapId: string,
+): { grade: Phaser.GameObjects.Rectangle } {
   const cam = scene.cameras.main
   const tint = MOOD_TINTS[mapId] ?? { color: 0xf0e0c0, alpha: 0.06 }
   const grade = scene.add
@@ -225,6 +228,7 @@ export function applyAtmosphere(scene: Phaser.Scene, mapId: string): void {
   }
   scene.scale.on('resize', layout)
   scene.events.once('shutdown', () => scene.scale.off('resize', layout))
+  return { grade }
 }
 
 /** 环境动效：水面波光 / 树摇 / 传送门脉冲 */

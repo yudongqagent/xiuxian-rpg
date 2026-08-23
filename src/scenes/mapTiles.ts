@@ -6,6 +6,15 @@ export const HOUSE_KEY = 'house'
 /** 图集帧序号：0草 1路 2水 3桥 4花草 5墙 6门户 */
 export const FRAME = { GRASS: 0, PATH: 1, WATER: 2, BRIDGE: 3, FLOWER: 4, WALL: 5, DOOR: 6 } as const
 
+// ==== gfx-scene：场景道具贴图键（B2）====
+export const PROP_KEYS = {
+  lantern: 'prop-lantern',
+  well: 'prop-well',
+  signpost: 'prop-signpost',
+  fence: 'prop-fence',
+  stall: 'prop-stall',
+} as const
+
 const T = 32
 const FRAMES = 7
 
@@ -65,4 +74,120 @@ export function buildMapTileTextures(scene: Phaser.Scene): void {
 
   atlas.refresh()
   for (let i = 0; i < FRAMES; i++) atlas.add(i, 0, i * T, 0, T, T)
+}
+
+// ==== gfx-scene：程序化道具贴图（B2，零二进制资源）====
+type Ctx = CanvasRenderingContext2D
+
+function propCircle(c: Ctx, x: number, y: number, r: number, col: string): void {
+  c.fillStyle = col
+  c.beginPath()
+  c.arc(x, y, r, 0, Math.PI * 2)
+  c.fill()
+}
+
+export function buildProps(scene: Phaser.Scene): void {
+  if (!scene.textures.exists(PROP_KEYS.lantern)) {
+    const tex = scene.textures.createCanvas(PROP_KEYS.lantern, 14, 24)!
+    const c = tex.context as Ctx
+    c.fillStyle = '#3a2a1a'
+    c.fillRect(5, 1, 4, 2)
+    c.fillStyle = '#c23b2e'
+    c.beginPath()
+    c.ellipse(7, 11, 6, 8, 0, 0, Math.PI * 2)
+    c.fill()
+    c.strokeStyle = '#e8b34a'
+    c.lineWidth = 1
+    for (const rx of [2.5, 4.5]) {
+      c.beginPath()
+      c.ellipse(7, 11, rx, 8, 0, 0, Math.PI * 2)
+      c.stroke()
+    }
+    c.fillRect(3, 11, 8, 1)
+    c.fillStyle = '#f6d992'
+    c.fillRect(5, 7, 4, 6)
+    c.fillStyle = '#3a2a1a'
+    c.fillRect(5, 19, 4, 2)
+    c.fillStyle = '#d94f3d'
+    c.fillRect(6, 21, 2, 3)
+    tex.refresh()
+  }
+  if (!scene.textures.exists(PROP_KEYS.well)) {
+    const tex = scene.textures.createCanvas(PROP_KEYS.well, 26, 26)!
+    const c = tex.context as Ctx
+    c.fillStyle = '#6f6a60'
+    c.fillRect(3, 14, 20, 10)
+    c.fillStyle = '#8a857a'
+    c.fillRect(3, 14, 20, 3)
+    propCircle(c, 13, 15, 6, '#2c2620')
+    propCircle(c, 13, 15, 4.5, '#17303e')
+    c.fillStyle = '#5a3a24'
+    c.fillRect(3, 4, 3, 12)
+    c.fillRect(20, 4, 3, 12)
+    c.fillStyle = '#7a5230'
+    c.fillRect(1, 2, 24, 4)
+    c.strokeStyle = '#c9bb90'
+    c.lineWidth = 1.5
+    c.beginPath()
+    c.moveTo(13, 6)
+    c.lineTo(13, 13)
+    c.stroke()
+    tex.refresh()
+  }
+  if (!scene.textures.exists(PROP_KEYS.signpost)) {
+    const tex = scene.textures.createCanvas(PROP_KEYS.signpost, 22, 28)!
+    const c = tex.context as Ctx
+    c.fillStyle = '#5a3a24'
+    c.fillRect(9, 8, 4, 19)
+    c.fillStyle = '#7a5230'
+    c.fillRect(2, 4, 18, 9)
+    c.fillStyle = '#93704a'
+    c.fillRect(3, 5, 16, 7)
+    c.strokeStyle = '#5a3a24'
+    c.lineWidth = 1
+    for (let i = 0; i < 2; i++) {
+      c.beginPath()
+      c.moveTo(5, 7 + i * 3)
+      c.lineTo(17, 7 + i * 3)
+      c.stroke()
+    }
+    tex.refresh()
+  }
+  if (!scene.textures.exists(PROP_KEYS.fence)) {
+    const tex = scene.textures.createCanvas(PROP_KEYS.fence, 32, 18)!
+    const c = tex.context as Ctx
+    c.fillStyle = '#8a6239'
+    c.fillRect(1, 5, 30, 3)
+    c.fillRect(1, 11, 30, 3)
+    c.fillStyle = '#6b4a2f'
+    for (const px of [2, 13, 25]) {
+      c.fillRect(px, 2, 4, 15)
+      c.fillStyle = '#7a5230'
+      c.fillRect(px, 2, 4, 2)
+      c.fillStyle = '#6b4a2f'
+    }
+    tex.refresh()
+  }
+  if (!scene.textures.exists(PROP_KEYS.stall)) {
+    const tex = scene.textures.createCanvas(PROP_KEYS.stall, 32, 28)!
+    const c = tex.context as Ctx
+    c.fillStyle = '#6b4a2f'
+    c.fillRect(3, 10, 3, 17)
+    c.fillRect(26, 10, 3, 17)
+    for (let i = 0; i < 8; i++) {
+      c.fillStyle = i % 2 ? '#c23b2e' : '#efe3cc'
+      c.fillRect(i * 4, 2, 4, 7)
+    }
+    c.fillStyle = '#8a6239'
+    c.fillRect(2, 16, 28, 9)
+    c.fillStyle = '#a87e46'
+    c.fillRect(2, 16, 28, 3)
+    c.fillStyle = '#4a7a48'
+    c.fillRect(7, 12, 5, 4)
+    c.fillStyle = '#d94f3d'
+    c.fillRect(15, 12, 5, 4)
+    c.fillStyle = '#e8b34a'
+    c.fillRect(22, 12, 4, 4)
+    tex.refresh()
+  }
 }
