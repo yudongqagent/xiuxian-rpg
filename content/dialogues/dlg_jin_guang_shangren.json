@@ -1,0 +1,12 @@
+{
+  "id": "dlg_jin_guang_shangren",
+  "npcId": "jin_guang_shangren",
+  "entry": "greet",
+  "nodes": [
+    {
+      "id": "greet",
+      "speaker": "金光商人",
+      "text": "客官请看！符箓丹药、灵草法器，货真价实，童叟无欺。要来点什么？"
+    }
+  ]
+}

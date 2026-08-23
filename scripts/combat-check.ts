@@ -38,6 +38,7 @@ import type { Enemy, Item } from '../src/systems/schemas'
 import { ItemSchema, SkillSchema } from '../src/systems/schemas'
 import { decodeSave, encodeSave, type SaveData } from '../src/engine/save'
 import { canCraft, craft } from '../src/systems/alchemy'
+import { buyItem, sellItem } from '../src/systems/player'
 import type { Recipe } from '../src/systems/schemas'
 import huodanShuJson from '../content/skills/huodan_shu.json'
 import changchunGongJson from '../content/skills/changchun_gong.json'
@@ -399,6 +400,26 @@ expect('玩家攻击锚点为10', PLAYER_BASE_STATS.atk === 10)
   const result = craft(p, recipe)
   expect('合成成功产出丹药', result.ok && (result.player.inventory['huichun_san'] ?? 0) === before + 2)
   expect('合成消耗材料', (result.player.inventory['qi_xie_ling_cao'] ?? 0) === 0 && (result.player.inventory['yaodan'] ?? 0) === 0)
+}
+
+// ===== INV-5：坊市买卖 =====
+{
+  let p = createPlayer()
+  p = { ...p, lingshi: 10, inventory: { ...p.inventory, qi_xie_ling_cao: 2 } }
+  const bought = buyItem(p, 'huiqi_san', 8)
+  expect('购买扣灵石并入包', bought.lingshi === 2 && (bought.inventory['huiqi_san'] ?? 0) === (p.inventory['huiqi_san'] ?? 0) + 1)
+  const poor = buyItem(p, 'huichun_san', 12)
+  expect('灵石不足拒绝购买', poor.lingshi === p.lingshi && poor === p)
+  const sold = sellItem(bought, 'qi_xie_ling_cao', 3)
+  expect('出售得款并减库存', sold.lingshi === bought.lingshi + 3 && (sold.inventory['qi_xie_ling_cao'] ?? 0) === 1)
+  let armed: ReturnType<typeof createPlayer> = {
+    ...createPlayer(),
+    lingshi: 0,
+    inventory: { ...createPlayer().inventory, tie_jian: 1 },
+    equipped: { weapon: 'tie_jian', armor: null },
+  }
+  armed = sellItem(armed, 'tie_jian', 5)
+  expect('卖出已装备武器自动卸下', armed.equipped.weapon === null && armed.lingshi === 5)
 }
 
 if (failures > 0) {

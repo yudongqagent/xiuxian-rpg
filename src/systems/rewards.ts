@@ -1,4 +1,5 @@
 import { bus } from '../engine/eventBus'
+import { updatePlayer } from './player'
 
 export interface RewardGrant {
   lingshi: number
@@ -10,4 +11,5 @@ export interface RewardGrant {
 export function grantRewards(rewards: RewardGrant): void {
   for (const itemId of rewards.items) bus.emit('item:acquired', { itemId })
   if (rewards.exp_qi > 0) bus.emit('reward:exp', { expQi: rewards.exp_qi })
+  if (rewards.lingshi > 0) updatePlayer((p) => ({ ...p, lingshi: p.lingshi + rewards.lingshi }))
 }

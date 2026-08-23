@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import Hud from './ui/Hud.vue'
 import Joystick from './ui/Joystick.vue'
 import InventoryPanel from './ui/InventoryPanel.vue'
@@ -8,15 +8,33 @@ import BattlePanel from './ui/BattlePanel.vue'
 import AreaBanner from './ui/AreaBanner.vue'
 import QuestLog from './ui/QuestLog.vue'
 import SavePanel from './ui/SavePanel.vue'
+import ShopPanel from './ui/ShopPanel.vue'
 import QuestToast from './ui/QuestToast.vue'
 import TitleSplash from './ui/TitleSplash.vue'
 import BattleTransition from './ui/BattleTransition.vue'
 import { initQuestRuntime } from './systems/questRuntime'
+import { bus } from './engine/eventBus'
 
 const gameHost = ref<HTMLElement | null>(null)
 const showInv = ref(false)
 const showQuests = ref(false)
 const showSaves = ref(false)
+const shopNpcId = ref<string | null>(null)
+let unShop: (() => void) | undefined
+
+/** 底部面板互斥：打开一个时关闭其余 */
+function openPanel(which: 'inv' | 'quests' | 'saves'): void {
+  showInv.value = which === 'inv'
+  showQuests.value = which === 'quests'
+  showSaves.value = which === 'saves'
+}
+function onAppKey(e: KeyboardEvent): void {
+  if (e.key !== 'Escape') return
+  if (showInv.value || showQuests.value || showSaves.value) {
+    showInv.value = showQuests.value = showSaves.value = false
+    e.preventDefault()
+  }
+}
 const booting = ref(false)
 let game: ReturnType<(typeof import('./engine/game'))['createGame']> | undefined
 let disposeQuests: (() => void) | undefined
@@ -31,20 +49,31 @@ async function startGame(): Promise<void> {
   booting.value = false
 }
 
+onMounted(() => {
+  // INV-5：对话中的「浏览商货」打开商店面板
+  unShop = bus.on('shop:open', ({ npcId }) => {
+    showInv.value = showQuests.value = showSaves.value = false
+    shopNpcId.value = npcId
+  })
+  window.addEventListener('keydown', onAppKey)
+})
 onUnmounted(() => {
   game?.destroy(true)
   disposeQuests?.()
+  unShop?.()
+  window.removeEventListener('keydown', onAppKey)
 })
 </script>
 
 <template>
   <div class="stage">
     <div ref="gameHost" class="game-host" />
-    <Hud @open-inventory="showInv = true" @open-quests="showQuests = true" @open-saves="showSaves = true" />
+    <Hud @open-inventory="openPanel('inv')" @open-quests="openPanel('quests')" @open-saves="openPanel('saves')" />
     <Joystick />
     <InventoryPanel v-if="showInv" @close="showInv = false" />
     <QuestLog v-if="showQuests" @close="showQuests = false" />
     <SavePanel v-if="showSaves" @close="showSaves = false" />
+    <ShopPanel v-if="shopNpcId" :npc-id="shopNpcId" @close="shopNpcId = null" />
     <DialogueBox />
     <BattlePanel />
     <AreaBanner />

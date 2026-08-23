@@ -35,6 +35,8 @@ type GameEvents = {
   'quest:turnin': { questId: string }
   /** 经验产出（成长系统接入前由任务奖励发出） */
   'reward:exp': { expQi: number }
+  /** INV-5：打开商店面板 */
+  'shop:open': { npcId: string }
   /** ENG-5：手动存/读档（slot 为 s1/s2/s3） */
   'save:write': { slot: string }
   'save:load': { slot: string }

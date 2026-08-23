@@ -1,0 +1,18 @@
+{
+  "id": "jin_guang_shangren",
+  "name": "金光商人·杂货",
+  "wares": [
+    {
+      "item": "huiqi_san",
+      "price": 8
+    },
+    {
+      "item": "huichun_san",
+      "price": 12
+    },
+    {
+      "item": "qi_xie_ling_cao",
+      "price": 6
+    }
+  ]
+}

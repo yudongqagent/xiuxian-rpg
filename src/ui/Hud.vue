@@ -39,7 +39,7 @@ function pctOf(v: number, max: number): string {
     <div class="realm">
       <span class="name">凡人 · {{ realmLabel(player.level) }}</span>
       <div class="bar"><i class="exp" :style="{ width: pctOf(player.exp, expToNext(player.level)) }" /></div>
-      <span class="hint">血 {{ player.hp }}/{{ stats.maxHp }} · 灵 {{ player.qi }}/{{ stats.maxQi }} · 攻 {{ stats.atk }} 防 {{ stats.def }} · 修为
+      <span class="hint">血 {{ player.hp }}/{{ stats.maxHp }} · 灵 {{ player.qi }}/{{ stats.maxQi }} · 攻 {{ stats.atk }} 防 {{ stats.def }} · 灵石 {{ player.lingshi }} · 修为
         {{ player.exp }}/{{ expToNext(player.level) }}</span>
     </div>
     <button class="btn" @click="$emit('open-saves')">存档</button>

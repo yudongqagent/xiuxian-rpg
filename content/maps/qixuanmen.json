@@ -74,6 +74,11 @@
       "npcId": "yue_tangzhu",
       "x": 17,
       "y": 14
+    },
+    {
+      "npcId": "jin_guang_shangren",
+      "x": 23,
+      "y": 20
     }
   ],
   "enemySpawns": [],

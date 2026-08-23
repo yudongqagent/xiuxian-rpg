@@ -21,6 +21,8 @@ export interface PlayerSave {
   exp: number
   hp: number
   qi: number
+  /** INV-5：灵石余额（additive 可选） */
+  lingshi?: number
   /** itemId → 数量 */
   inventory: Record<string, number>
   skills: string[]

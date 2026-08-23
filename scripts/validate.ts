@@ -6,7 +6,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { z } from 'zod'
-import { ItemSchema, SkillSchema, NpcSchema, RegionSchema, DialogueSchema, EnemySchema, QuestSchema, GameMapSchema, WALKABLE_TILE_CHARS, RecipeSchema } from '../src/systems/schemas'
+import { ItemSchema, SkillSchema, NpcSchema, RegionSchema, DialogueSchema, EnemySchema, QuestSchema, GameMapSchema, WALKABLE_TILE_CHARS, RecipeSchema, ShopSchema } from '../src/systems/schemas'
 
 const ROOT = join(import.meta.dirname, '..', 'content')
 
@@ -35,6 +35,7 @@ check('区域', RegionSchema, 'world')
 check('对话', DialogueSchema, 'dialogues')
 check('妖兽', EnemySchema, 'enemies')
 check('配方', RecipeSchema, 'recipes')
+check('商店', ShopSchema, 'shops')
 check('任务', QuestSchema, 'quests')
 check('地图', GameMapSchema, 'maps')
 
@@ -180,6 +181,14 @@ function checkRefs() {
     const loot = Array.isArray(enemy['loot']) ? (enemy['loot'] as Array<{ item?: string }>) : []
     for (const entry of loot) {
       if (entry.item && !itemIds.has(entry.item)) refErr(`妖兽 ${eid}`, '掉落物品', entry.item)
+    }
+  }
+  for (const shop of readAll('shops')) {
+    const sid = String(shop['id'])
+    if (!npcIds.has(sid)) refErr(`商店 ${sid}`, '商贩 NPC', sid)
+    const wares = Array.isArray(shop['wares']) ? (shop['wares'] as Array<{ item?: string }>) : []
+    for (const ware of wares) {
+      if (ware.item && !itemIds.has(ware.item)) refErr(`商店 ${sid}`, '商品', ware.item)
     }
   }
   for (const recipe of readAll('recipes')) {

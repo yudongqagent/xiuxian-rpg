@@ -16,6 +16,8 @@ export interface PlayerState {
   exp: number
   hp: number
   qi: number
+  /** INV-5：灵石（货币） */
+  lingshi: number
   inventory: Record<string, number>
   skills: string[]
   /** INV-3：已装备武器/防具（itemId；物品仍保留在背包） */
@@ -60,6 +62,7 @@ export function unequipItem(p: PlayerState, slot: keyof Equipped): PlayerState {
 }
 
 export const STARTING_SKILLS = ['huodan_shu'] as const
+export const STARTING_LINGSHI = 20
 export const STARTING_INVENTORY: Record<string, number> = { huiqi_san: 3, huichun_san: 2, tie_jian: 1, qi_xie_ling_cao: 4 }
 
 const EXP_BASE = 30
@@ -103,6 +106,7 @@ export function createPlayer(): PlayerState {
     exp: 0,
     hp: s.maxHp,
     qi: s.maxQi,
+    lingshi: STARTING_LINGSHI,
     inventory: { ...STARTING_INVENTORY },
     skills: [...STARTING_SKILLS],
     equipped: { weapon: null, armor: null },
@@ -148,6 +152,27 @@ export function removeItem(p: PlayerState, itemId: string, count = 1): PlayerSta
   return { ...p, inventory: inv }
 }
 
+/** INV-5：购买（价格由商店表提供）；灵石不足返回原状态 */
+export function buyItem(p: PlayerState, itemId: string, price: number): PlayerState {
+  if (p.lingshi < price) return p
+  return { ...p, lingshi: p.lingshi - price, inventory: { ...p.inventory, [itemId]: (p.inventory[itemId] ?? 0) + 1 } }
+}
+
+/** INV-5：出售一件物品，得价 unitPrice */
+export function sellItem(p: PlayerState, itemId: string, unitPrice: number): PlayerState {
+  const have = p.inventory[itemId] ?? 0
+  if (have <= 0) return p
+  const inv = { ...p.inventory }
+  if (inv[itemId] === 1) delete inv[itemId]
+  else inv[itemId] = have - 1
+  // 出售已装备的唯一武器/防具时自动卸下
+  const equipped = { ...p.equipped }
+  for (const slot of ['weapon', 'armor'] as const) {
+    if (equipped[slot] === itemId && !(inv[itemId] > 0)) equipped[slot] = null
+  }
+  return { ...p, lingshi: p.lingshi + Math.max(1, unitPrice), inventory: inv, equipped }
+}
+
 /** 战败惩罚（宽）：重伤回出生点，气血折半、灵气保留 */
 export function respawnPenalty(p: PlayerState): PlayerState {
   const s = statsForLevel(p.level)
@@ -170,6 +195,7 @@ export function toPlayerSave(p: PlayerState): PlayerSave {
     exp: p.exp,
     hp: p.hp,
     qi: p.qi,
+    lingshi: p.lingshi,
     inventory: { ...p.inventory },
     skills: [...p.skills],
     equipped: { ...p.equipped },
@@ -193,6 +219,7 @@ export function fromPlayerSave(s: PlayerSave | undefined): PlayerState {
       weapon: s.equipped?.weapon ?? null,
       armor: s.equipped?.armor ?? null,
     },
+    lingshi: Math.max(0, s.lingshi ?? STARTING_LINGSHI),
   }
 }
 

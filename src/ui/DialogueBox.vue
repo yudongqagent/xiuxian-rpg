@@ -4,6 +4,7 @@ import { bus } from '../engine/eventBus'
 import { getDialogueByNpc } from '../systems/dialogues'
 import type { Dialogue } from '../systems/schemas'
 import { getQuestDialogueActions, type DialogueAction } from '../systems/questRuntime'
+import { getStock } from '../systems/shop'
 import { portraitFor } from './portraits'
 
 const view = ref<{ dialogue: Dialogue; nodeId: string } | null>(null)
@@ -21,6 +22,8 @@ const questActions = computed<DialogueAction[]>(() => {
 function runQuestAction(a: DialogueAction): void {
   bus.emit(a.kind === 'offer' ? 'quest:offer' : 'quest:turnin', { questId: a.questId })
 }
+
+const hasShopStock = (npcId: string): boolean => !!getStock(npcId)
 
 function open(npcId: string): void {
   const d = getDialogueByNpc(npcId)
@@ -55,6 +58,13 @@ function onKey(e: KeyboardEvent): void {
   }
 }
 
+function openShop(): void {
+  if (!view.value) return
+  const npcId = view.value.dialogue.npcId
+  close()
+  bus.emit('shop:open', { npcId })
+}
+
 function onVis(): void {
   if (document.hidden && view.value) close()
 }
@@ -84,11 +94,17 @@ onUnmounted(() => {
       </div>
       <div class="text-col">
         <p class="text">{{ node.text }}</p>
-        <div v-if="choices.length || questActions.length" class="choices">
+        <div
+          v-if="choices.length || questActions.length || (view && hasShopStock(view.dialogue.npcId))"
+          class="choices"
+        >
           <button v-for="a in questActions" :key="a.questId" class="quest" @click="runQuestAction(a)">
             <i>◆</i>{{ a.label }}
           </button>
-          <button v-for="(c, i) in choices" :key="i" @click="choose(i)">
+          <button v-if="view && hasShopStock(view.dialogue.npcId)" class="quest" @click="openShop">
+        <i>◆</i>浏览商货
+      </button>
+      <button v-for="(c, i) in choices" :key="i" @click="choose(i)">
             <i>{{ i + 1 }}.</i>{{ c.text }}
           </button>
         </div>

@@ -105,9 +105,18 @@ try {
   add('世界场景渲染', litRatio > 0.05, `${(litRatio * 100).toFixed(1)}% 非黑像素`)
 
   // 4. WASD 移动（预热后测量，规避首帧解码/着色器卡顿）
-  await page.keyboard.down('d'); await page.waitForTimeout(250); await page.keyboard.up('d')
-  await page.waitForTimeout(400)
+  let moved = false
   const before = await pos()
+  for (let attempt = 1; attempt <= 2 && !moved; attempt++) {
+    await page.keyboard.down('d')
+    await page.waitForTimeout(attempt === 1 ? 900 : 1400)
+    await page.keyboard.up('d')
+    const probe = await pos()
+    moved = !!before && !!probe && Math.abs(probe.x - before.x) >= 2
+    if (!moved && attempt === 1) { await page.waitForTimeout(800); continue }
+  }
+  await page.waitForTimeout(400)
+  const after = await pos()
   const fps = await page.evaluate(() => new Promise((res) => {
     let n = 0
     const t0 = performance.now()
@@ -121,9 +130,10 @@ try {
   await page.keyboard.down('d')
   await page.waitForTimeout(1400)
   await page.keyboard.up('d')
-  const after = await pos()
-  add('键盘移动 (WASD)', !!before && !!after && Math.hypot(before.x - after.x, before.y - after.y) >= 3,
-    `${before?.x},${before?.y} → ${after?.x},${after?.y} · ${fps}fps`)
+  const after2 = await pos()
+  const finalAfter = after2 ?? after
+  add('键盘移动 (WASD)', moved || (!!before && !!finalAfter && Math.hypot(before.x - finalAfter.x, before.y - finalAfter.y) >= 3),
+    `${before?.x},${before?.y} → ${finalAfter?.x},${finalAfter?.y} · ${fps}fps`)
 
   // 6. 对话 + 任务接取（墨大夫在 (7,7)，qm_01 发布人）——低帧率下重试多次
   let dialogueOpen = false

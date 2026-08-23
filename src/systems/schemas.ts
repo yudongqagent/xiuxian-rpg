@@ -162,6 +162,18 @@ export const QuestStepSchema = z.discriminatedUnion('kind', [
   }),
 ])
 
+/** INV-5：商店（NPC 摊位 wares） */
+export const ShopSchema = z.object({
+  id: z.string().regex(/^[a-z0-9_]+$/),
+  name: z.string().min(1).max(30),
+  wares: z
+    .array(z.object({ item: z.string().regex(/^[a-z0-9_]+$/), price: z.number().int().min(1) }))
+    .min(1)
+    .max(24),
+})
+
+export type Shop = z.infer<typeof ShopSchema>
+
 /** INV-4：炼丹配方（inputs → output） */
 export const RecipeSchema = z.object({
   id: z.string().regex(/^[a-z0-9_]+$/),
