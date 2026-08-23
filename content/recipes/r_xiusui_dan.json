@@ -1,0 +1,19 @@
+{
+  "id": "r_xiusui_dan",
+  "name": "炼制洗髓丹",
+  "inputs": [
+    {
+      "item": "yaodan",
+      "count": 1
+    },
+    {
+      "item": "qi_xie_ling_cao",
+      "count": 2
+    }
+  ],
+  "output": {
+    "item": "xi_sui_dan",
+    "count": 1
+  },
+  "description": "妖丹为引、灵草为辅，洗筋伐髓，灵气大补。"
+}

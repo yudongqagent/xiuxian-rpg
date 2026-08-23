@@ -1,0 +1,15 @@
+{
+  "id": "r_huichun_san",
+  "name": "炼制回春散",
+  "inputs": [
+    {
+      "item": "qi_xie_ling_cao",
+      "count": 3
+    }
+  ],
+  "output": {
+    "item": "huichun_san",
+    "count": 1
+  },
+  "description": "以三株七叶灵草温火熬炼，得回春散一服。"
+}

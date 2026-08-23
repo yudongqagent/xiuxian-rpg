@@ -162,6 +162,23 @@ export const QuestStepSchema = z.discriminatedUnion('kind', [
   }),
 ])
 
+/** INV-4：炼丹配方（inputs → output） */
+export const RecipeSchema = z.object({
+  id: z.string().regex(/^[a-z0-9_]+$/),
+  name: z.string().min(1).max(30),
+  inputs: z
+    .array(z.object({ item: z.string().regex(/^[a-z0-9_]+$/), count: z.number().int().min(1) }))
+    .min(1)
+    .max(6),
+  output: z.object({
+    item: z.string().regex(/^[a-z0-9_]+$/),
+    count: z.number().int().min(1),
+  }),
+  description: z.string().max(120),
+})
+
+export type Recipe = z.infer<typeof RecipeSchema>
+
 export const QuestSchema = z.object({
   id: z.string().regex(/^[a-z0-9_]+$/),
   name: z.string().min(1).max(40),

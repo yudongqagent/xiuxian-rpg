@@ -37,6 +37,8 @@ import {
 import type { Enemy, Item } from '../src/systems/schemas'
 import { ItemSchema, SkillSchema } from '../src/systems/schemas'
 import { decodeSave, encodeSave, type SaveData } from '../src/engine/save'
+import { canCraft, craft } from '../src/systems/alchemy'
+import type { Recipe } from '../src/systems/schemas'
 import huodanShuJson from '../content/skills/huodan_shu.json'
 import changchunGongJson from '../content/skills/changchun_gong.json'
 import zhayanJianfaJson from '../content/skills/zhayan_jianfa.json'
@@ -368,6 +370,35 @@ expect('玩家攻击锚点为10', PLAYER_BASE_STATS.atk === 10)
   )
   expect('篡改校验失败', decodeSave(code.slice(0, -2) + 'zz') === null)
   expect('非存档码返回 null', decodeSave('hello world') === null)
+}
+
+// ===== INV-4：炼丹 =====
+{
+  const recipe: Recipe = {
+    id: 'r_huichun_san',
+    name: '炼制回春散',
+    inputs: [
+      { item: 'qi_xie_ling_cao', count: 3 },
+      { item: 'yaodan', count: 1 },
+    ],
+    output: { item: 'huichun_san', count: 2 },
+    description: '',
+  }
+  // 显式空背包夹具（起始物品不影响断言）
+  let p: ReturnType<typeof createPlayer> = { ...createPlayer(), inventory: {} }
+  expect('材料不足不可合成', !canCraft(p, recipe))
+  const failed = craft(p, recipe)
+  expect('合成失败不改背包', !failed.ok && (failed.player.inventory['qi_xie_ling_cao'] ?? 0) === (p.inventory['qi_xie_ling_cao'] ?? 0))
+
+  p = addItem(addItem(addItem(p, 'qi_xie_ling_cao'), 'qi_xie_ling_cao'), 'yaodan')
+  expect('仍差一味材料', !canCraft(p, recipe))
+  p = addItem(p, 'qi_xie_ling_cao')
+  expect('材料齐备可合成', canCraft(p, recipe))
+
+  const before = p.inventory['huichun_san'] ?? 0
+  const result = craft(p, recipe)
+  expect('合成成功产出丹药', result.ok && (result.player.inventory['huichun_san'] ?? 0) === before + 2)
+  expect('合成消耗材料', (result.player.inventory['qi_xie_ling_cao'] ?? 0) === 0 && (result.player.inventory['yaodan'] ?? 0) === 0)
 }
 
 if (failures > 0) {

@@ -6,7 +6,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { z } from 'zod'
-import { ItemSchema, SkillSchema, NpcSchema, RegionSchema, DialogueSchema, EnemySchema, QuestSchema, GameMapSchema, WALKABLE_TILE_CHARS } from '../src/systems/schemas'
+import { ItemSchema, SkillSchema, NpcSchema, RegionSchema, DialogueSchema, EnemySchema, QuestSchema, GameMapSchema, WALKABLE_TILE_CHARS, RecipeSchema } from '../src/systems/schemas'
 
 const ROOT = join(import.meta.dirname, '..', 'content')
 
@@ -34,6 +34,7 @@ check('人物', NpcSchema, 'npcs')
 check('区域', RegionSchema, 'world')
 check('对话', DialogueSchema, 'dialogues')
 check('妖兽', EnemySchema, 'enemies')
+check('配方', RecipeSchema, 'recipes')
 check('任务', QuestSchema, 'quests')
 check('地图', GameMapSchema, 'maps')
 
@@ -180,6 +181,15 @@ function checkRefs() {
     for (const entry of loot) {
       if (entry.item && !itemIds.has(entry.item)) refErr(`妖兽 ${eid}`, '掉落物品', entry.item)
     }
+  }
+  for (const recipe of readAll('recipes')) {
+    const rid = String(recipe['id'])
+    const inputs = Array.isArray(recipe['inputs']) ? (recipe['inputs'] as Array<{ item?: string }>) : []
+    for (const i of inputs) {
+      if (i.item && !itemIds.has(i.item)) refErr(`配方 ${rid}`, '材料', i.item)
+    }
+    const out = (recipe['output'] as { item?: string })?.item
+    if (out && !itemIds.has(out)) refErr(`配方 ${rid}`, '产物', out)
   }
   console.log('✓ 引用完整性校验通过')
 }

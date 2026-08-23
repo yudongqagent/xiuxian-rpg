@@ -60,7 +60,7 @@ export function unequipItem(p: PlayerState, slot: keyof Equipped): PlayerState {
 }
 
 export const STARTING_SKILLS = ['huodan_shu'] as const
-export const STARTING_INVENTORY: Record<string, number> = { huiqi_san: 3, huichun_san: 2, tie_jian: 1 }
+export const STARTING_INVENTORY: Record<string, number> = { huiqi_san: 3, huichun_san: 2, tie_jian: 1, qi_xie_ling_cao: 4 }
 
 const EXP_BASE = 30
 const EXP_STEP = 20

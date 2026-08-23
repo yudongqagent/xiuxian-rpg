@@ -13,6 +13,29 @@ import {
   type Equipped,
 } from '../systems/player'
 import { ITEMS } from '../systems/itemBook'
+import { canCraft, craft, missingInputs } from '../systems/alchemy'
+import type { Recipe } from '../systems/schemas'
+
+const recipeEntries = Object.entries(
+  import.meta.glob('../../content/recipes/*.json', { eager: true }) as Record<string, unknown>,
+)
+const RECIPES: Recipe[] = []
+for (const [path, raw] of recipeEntries) {
+  try {
+    const o = raw as Record<string, unknown>
+    const inputs = (o['inputs'] as Array<{ item: string; count: number }>) ?? []
+    const out = o['output'] as { item: string; count: number }
+    RECIPES.push({
+      id: String(o['id']),
+      name: String(o['name']),
+      inputs,
+      output: out,
+      description: String(o['description'] ?? ''),
+    })
+  } catch {
+    console.error(`[alchemy] 配方解析失败: ${path}`)
+  }
+}
 
 const ITEM_BOOK: Record<string, Item> = ITEMS
 const skillEntries = Object.entries(
@@ -41,7 +64,7 @@ function safeSkill(raw: unknown): { id: string; name: string; grade: string; kin
   }
 }
 
-const tab = ref<'items' | 'skills'>('items')
+const tab = ref<'items' | 'skills' | 'alchemy'>('items')
 const player = ref(getPlayer())
 const unsub = subscribePlayer(() => (player.value = getPlayer()))
 onUnmounted(unsub)
@@ -52,6 +75,13 @@ const eff = computed(() =>
 
 function slotItemId(slot: keyof Equipped): string | null {
   return player.value.equipped[slot]
+}
+
+function onCraft(r: Recipe): void {
+  if (!canCraft(player.value, r)) return
+  const result = craft(getPlayer(), r)
+  updatePlayer(() => result.player)
+  bus.emit('item:acquired', { itemId: r.output.item, count: r.output.count })
 }
 
 function onToggleEquip(item: Item): void {
@@ -82,6 +112,7 @@ const skills = computed(() =>
       <nav>
         <button :class="{ on: tab === 'items' }" @click="tab = 'items'">物品</button>
         <button :class="{ on: tab === 'skills' }" @click="tab = 'skills'">功法</button>
+        <button :class="{ on: tab === 'alchemy' }" @click="tab = 'alchemy'">炼丹</button>
       </nav>
       <button class="close" @click="$emit('close')">✕</button>
     </header>
@@ -121,6 +152,25 @@ const skills = computed(() =>
       </li>
       <p v-if="skills.length === 0" class="empty">尚未习得任何功法</p>
     </ul>
+    <div v-if="tab === 'alchemy'" class="alch">
+      <div v-for="r in RECIPES" :key="r.id" class="recipe">
+        <div class="rhead">
+          <span>{{ r.name }}</span>
+          <button class="ink-btn" :disabled="!canCraft(player, r)" @click="onCraft(r)">
+            {{ canCraft(player, r) ? '炼 制' : '材料不足' }}
+          </button>
+        </div>
+        <small class="mats">
+          <template v-for="(i, idx) in r.inputs" :key="i.item">
+            <span :class="{ lack: (player.inventory[i.item] ?? 0) < i.count }">
+              {{ ITEM_BOOK[i.item]?.name ?? i.item }} {{ player.inventory[i.item] ?? 0 }}/{{ i.count }}
+            </span><template v-if="idx < r.inputs.length - 1"> · </template>
+          </template>
+          <b> → {{ ITEM_BOOK[r.output.item]?.name ?? r.output.item }} ×{{ r.output.count }}</b>
+        </small>
+      </div>
+      <p v-if="RECIPES.length === 0" class="empty">暂无丹方</p>
+    </div>
   </div>
 </template>
 
@@ -220,5 +270,31 @@ small {
   color: #ffd97a;
   font-size: 12px;
   padding: 0 10px;
+}
+.alch {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.recipe {
+  border: 1px solid rgba(139, 105, 20, 0.4);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.rhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #f2e6c8;
+  font-size: 14px;
+}
+.mats {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  opacity: 0.8;
+}
+.mats .lack {
+  color: #e08a7a;
 }
 </style>
