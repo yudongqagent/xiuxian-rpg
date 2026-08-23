@@ -24,6 +24,8 @@ export interface PlayerSave {
   /** itemId → 数量 */
   inventory: Record<string, number>
   skills: string[]
+  /** INV-3：已装备武器/防具（additive 可选，旧档缺省为空） */
+  equipped?: { weapon: string | null; armor: string | null }
 }
 
 export interface SaveData {

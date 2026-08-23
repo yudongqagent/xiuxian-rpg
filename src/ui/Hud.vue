@@ -2,12 +2,13 @@
 import { computed, onUnmounted, ref } from 'vue'
 import { bus } from '../engine/eventBus'
 import {
+  effectiveStats,
   expToNext,
   getPlayer,
   realmLabel,
-  statsForLevel,
   subscribePlayer,
 } from '../systems/player'
+import { ITEMS } from '../systems/itemBook'
 import { getTrackedQuest, type TrackedQuestView } from '../systems/questRuntime'
 
 defineEmits<{ 'open-inventory': []; 'open-quests': []; 'open-saves': [] }>()
@@ -24,7 +25,9 @@ onUnmounted(() => {
   unQuest()
 })
 
-const stats = computed(() => statsForLevel(player.value.level))
+const stats = computed(() =>
+  effectiveStats(player.value.level, player.value.equipped, (id) => ITEMS[id]),
+)
 
 function pctOf(v: number, max: number): string {
   return `${Math.min(100, Math.round((v / max) * 100))}%`
@@ -36,7 +39,7 @@ function pctOf(v: number, max: number): string {
     <div class="realm">
       <span class="name">凡人 · {{ realmLabel(player.level) }}</span>
       <div class="bar"><i class="exp" :style="{ width: pctOf(player.exp, expToNext(player.level)) }" /></div>
-      <span class="hint">血 {{ player.hp }}/{{ stats.maxHp }} · 灵 {{ player.qi }}/{{ stats.maxQi }} · 修为
+      <span class="hint">血 {{ player.hp }}/{{ stats.maxHp }} · 灵 {{ player.qi }}/{{ stats.maxQi }} · 攻 {{ stats.atk }} 防 {{ stats.def }} · 修为
         {{ player.exp }}/{{ expToNext(player.level) }}</span>
     </div>
     <button class="btn" @click="$emit('open-saves')">存档</button>

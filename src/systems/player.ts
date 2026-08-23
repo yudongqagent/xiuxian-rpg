@@ -6,6 +6,11 @@
 import { PLAYER_BASE_STATS } from './combat'
 import type { PlayerSave } from '../engine/save'
 
+export interface Equipped {
+  weapon: string | null
+  armor: string | null
+}
+
 export interface PlayerState {
   level: number
   exp: number
@@ -13,10 +18,49 @@ export interface PlayerState {
   qi: number
   inventory: Record<string, number>
   skills: string[]
+  /** INV-3：已装备武器/防具（itemId；物品仍保留在背包） */
+  equipped: Equipped
+}
+
+/** INV-3：基础属性 + 装备加成。lookup 由调用方注入（UI 用全量物品表，测试用夹具）。 */
+export function effectiveStats(
+  level: number,
+  equipped: Equipped,
+  lookup: (id: string) => { stats?: { atk?: number; def?: number; hp?: number } } | undefined,
+): {
+  maxHp: number
+  maxQi: number
+  atk: number
+  def: number
+  speed: number
+} {
+  const base = statsForLevel(level)
+  let atk = base.atk
+  let def = base.def
+  let maxHp = base.maxHp
+  for (const id of [equipped.weapon, equipped.armor]) {
+    if (!id) continue
+    const bonus = lookup(id)?.stats
+    if (!bonus) continue
+    atk += bonus.atk ?? 0
+    def += bonus.def ?? 0
+    maxHp += bonus.hp ?? 0
+  }
+  return { ...base, atk, def, maxHp }
+}
+
+/** 穿着：仅登记 slot→itemId；物品仍在背包（数量不减）。须持有该物品。 */
+export function equipItem(p: PlayerState, slot: keyof Equipped, itemId: string): PlayerState {
+  if (!((p.inventory[itemId] ?? 0) > 0)) return p
+  return { ...p, equipped: { ...p.equipped, [slot]: itemId } }
+}
+
+export function unequipItem(p: PlayerState, slot: keyof Equipped): PlayerState {
+  return { ...p, equipped: { ...p.equipped, [slot]: null } }
 }
 
 export const STARTING_SKILLS = ['huodan_shu'] as const
-export const STARTING_INVENTORY: Record<string, number> = { huiqi_san: 3, huichun_san: 2 }
+export const STARTING_INVENTORY: Record<string, number> = { huiqi_san: 3, huichun_san: 2, tie_jian: 1 }
 
 const EXP_BASE = 30
 const EXP_STEP = 20
@@ -61,6 +105,7 @@ export function createPlayer(): PlayerState {
     qi: s.maxQi,
     inventory: { ...STARTING_INVENTORY },
     skills: [...STARTING_SKILLS],
+    equipped: { weapon: null, armor: null },
   }
 }
 
@@ -127,6 +172,7 @@ export function toPlayerSave(p: PlayerState): PlayerSave {
     qi: p.qi,
     inventory: { ...p.inventory },
     skills: [...p.skills],
+    equipped: { ...p.equipped },
   }
 }
 
@@ -143,6 +189,10 @@ export function fromPlayerSave(s: PlayerSave | undefined): PlayerState {
     qi: clampInt(s.qi ?? stats.maxQi, 0, stats.maxQi),
     inventory: { ...fresh.inventory, ...(s.inventory ?? {}) },
     skills: Array.from(new Set([...fresh.skills, ...(s.skills ?? [])])),
+    equipped: {
+      weapon: s.equipped?.weapon ?? null,
+      armor: s.equipped?.armor ?? null,
+    },
   }
 }
 

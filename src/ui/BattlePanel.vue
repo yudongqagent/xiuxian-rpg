@@ -20,13 +20,14 @@ import {
   getPlayer,
   grantExp,
   realmLabel,
-  statsForLevel,
+  effectiveStats,
   subscribePlayer,
   syncAfterBattle,
   removeItem,
   updatePlayer,
 } from '../systems/player'
 
+import { ITEMS } from '../systems/itemBook'
 import huiLang from '../../content/enemies/hui_lang.json'
 import shanXiao from '../../content/enemies/shan_xiao.json'
 import duZhu from '../../content/enemies/du_zhu.json'
@@ -63,12 +64,7 @@ const SKILL_BOOK: Record<string, Skill> = Object.fromEntries(
     return [s.id, s]
   }),
 )
-const ITEM_BOOK: Record<string, Item> = Object.fromEntries(
-  [huiqiSan, huichunSan, xiSuiDan].map((raw) => {
-    const i = ItemSchema.parse(raw)
-    return [i.id, i]
-  }),
-)
+const ITEM_BOOK: Record<string, Item> = ITEMS
 
 const FLOATER_LIFE_MS = 900
 const PROJECTILE_MS = 500
@@ -140,7 +136,7 @@ const unsubStart = bus.on('battle:start', ({ enemyId }) => {
   battleEnemyId = enemyId
   const template = ENEMY_TEMPLATES[enemyId] ?? fallbackEnemy(enemyId)
   const p = getPlayer()
-  const stats = statsForLevel(p.level)
+  const stats = effectiveStats(p.level, p.equipped, (id) => ITEM_BOOK[id])
   // combat.ts 内部用 structuredClone，不能传入响应式 Proxy
   const rawTemplate = toRaw(template)
   state.value = createBattle(rawTemplate, { stats, hp: p.hp, qi: p.qi })

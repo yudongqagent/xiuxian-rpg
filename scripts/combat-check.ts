@@ -23,6 +23,8 @@ import {
 import {
   addItem,
   createPlayer,
+  effectiveStats,
+  equipItem,
   expToNext,
   fromPlayerSave,
   grantExp,
@@ -30,9 +32,10 @@ import {
   removeItem,
   respawnPenalty,
   statsForLevel,
+  unequipItem,
 } from '../src/systems/player'
 import type { Enemy, Item } from '../src/systems/schemas'
-import { SkillSchema } from '../src/systems/schemas'
+import { ItemSchema, SkillSchema } from '../src/systems/schemas'
 import huodanShuJson from '../content/skills/huodan_shu.json'
 import changchunGongJson from '../content/skills/changchun_gong.json'
 import zhayanJianfaJson from '../content/skills/zhayan_jianfa.json'
@@ -301,6 +304,42 @@ expect('玩家攻击锚点为10', PLAYER_BASE_STATS.atk === 10)
   expect('低随机值逃跑成功', fled.over && fled.fled)
   const stuck = attemptFlee(createBattle(wolf), () => 0.99)
   expect('逃跑失败继续战斗并受反击', !stuck.over && stuck.player.hp < stuck.player.maxHp)
+}
+
+// ===== INV-3：装备系统 =====
+{
+  const LOOKUP = (id: string) => EQUIP_FIXTURES[id]
+  const EQUIP_FIXTURES: Record<string, Item> = {
+    tie_jian: ItemSchema.parse({ id: 'tie_jian', name: '铁剑', type: 'weapon', grade: '凡品', description: '', stats: { atk: 6 } }),
+    tie_jia: ItemSchema.parse({ id: 'tie_jia', name: '铁甲', type: 'armor', grade: '凡品', description: '', stats: { def: 3, hp: 5 } }),
+  }
+  let p = createPlayer()
+  const base = effectiveStats(p.level, p.equipped, LOOKUP)
+  expect('无装备时属性=基础属性', base.atk === statsForLevel(1).atk && base.def === statsForLevel(1).def)
+
+  p = addItem(addItem(p, 'tie_jian'), 'tie_jia')
+  p = equipItem(p, 'weapon', 'tie_jian')
+  p = equipItem(p, 'armor', 'tie_jia')
+  const equipped = effectiveStats(p.level, p.equipped, LOOKUP)
+  expect('武器攻+6生效', equipped.atk === statsForLevel(1).atk + 6)
+  expect('防具防+3/血+5生效', equipped.def === statsForLevel(1).def + 3 && equipped.maxHp === statsForLevel(1).maxHp + 5)
+
+  const before = createBattle(wolf, { stats: base, hp: base.maxHp, qi: 40 })
+  const after = createBattle(wolf, { stats: equipped, hp: equipped.maxHp, qi: 40 })
+  const dmgBase = playerAttack(before, () => 0.5).enemy.hp
+  const dmgEq = playerAttack(after, () => 0.5).enemy.hp
+  expect('装备提升实际伤害', dmgEq < dmgBase)
+
+  p = unequipItem(p, 'weapon')
+  expect('卸下后攻回退', effectiveStats(p.level, p.equipped, LOOKUP).atk === statsForLevel(1).atk)
+
+  const notOwned = equipItem(p, 'weapon', 'qingyun_jian')
+  expect('未持有物品不可装备', notOwned.equipped.weapon === null)
+
+  const saved = fromPlayerSave({ level: 2, exp: 0, hp: 50, qi: 40, inventory: {}, skills: [], equipped: { weapon: 'tie_jian', armor: null } })
+  expect('存档往返保留装备', saved.equipped.weapon === 'tie_jian')
+  const legacy = fromPlayerSave(undefined)
+  expect('旧档装备缺省为空', legacy.equipped.weapon === null && legacy.equipped.armor === null)
 }
 
 if (failures > 0) {
