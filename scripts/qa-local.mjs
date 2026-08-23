@@ -53,6 +53,14 @@ async function navTo(tx, ty, tol = 0.9) {
 try {
   await page.goto(URL, { waitUntil: 'networkidle', timeout: 60000 })
 
+  // 标题画面：若存在则点击「开始游戏」进入（splash v-if 移除后不再拦截点击）
+  const startBtn = page.locator('.splash .start, .splash button').first()
+  if (await startBtn.isVisible({ timeout: 4000 }).catch(() => false)) {
+    await startBtn.click()
+    add('标题画面 → 开始', true)
+    await page.waitForTimeout(1200)
+  }
+
   // 0. 区域横幅（进入默认地图七玄门山村时短暂展示，轮询捕捉；同时等待场景就绪）
   const bannerSeen = await page
     .locator('.area-banner')
@@ -90,20 +98,40 @@ try {
   }, `data:image/png;base64,${shot.toString('base64')}`)
   add('世界场景渲染', litRatio > 0.05, `${(litRatio * 100).toFixed(1)}% 非黑像素`)
 
-  // 4. WASD 移动
+  // 4. WASD 移动（预热后测量，规避首帧解码/着色器卡顿）
+  await page.keyboard.down('d'); await page.waitForTimeout(250); await page.keyboard.up('d')
+  await page.waitForTimeout(400)
   const before = await pos()
+  const fps = await page.evaluate(() => new Promise((res) => {
+    let n = 0
+    const t0 = performance.now()
+    const tick = () => {
+      n++
+      if (performance.now() - t0 < 1000) requestAnimationFrame(tick)
+      else res(n)
+    }
+    requestAnimationFrame(tick)
+  }))
   await page.keyboard.down('d')
-  await page.waitForTimeout(900)
+  await page.waitForTimeout(1400)
   await page.keyboard.up('d')
   const after = await pos()
-  add('键盘移动 (WASD)', !!before && !!after && Math.hypot(before.x - after.x, before.y - after.y) > 1,
-    `${before?.x},${before?.y} → ${after?.x},${after?.y}`)
+  add('键盘移动 (WASD)', !!before && !!after && Math.hypot(before.x - after.x, before.y - after.y) >= 3,
+    `${before?.x},${before?.y} → ${after?.x},${after?.y} · ${fps}fps`)
 
-  // 6. 对话 + 任务接取（墨大夫在 (7,7)，qm_01 发布人）
-  await navTo(7.5, 8.4)
-  await page.keyboard.down('e'); await page.waitForTimeout(150); await page.keyboard.up('e')
-  await page.waitForTimeout(700)
-  let dialogueOpen = await page.locator('.dialogue').isVisible().catch(() => false)
+  // 6. 对话 + 任务接取（墨大夫在 (7,7)，qm_01 发布人）——低帧率下重试多次
+  let dialogueOpen = false
+  for (let attempt = 0; attempt < 4 && !dialogueOpen; attempt++) {
+    await navTo(7.5, 8.4)
+    await page.keyboard.down('e'); await page.waitForTimeout(180); await page.keyboard.up('e')
+    await page.waitForTimeout(700)
+    dialogueOpen = await page.locator('.dialogue').isVisible().catch(() => false)
+    if (!dialogueOpen) {
+      // 微调站位再试
+      await page.keyboard.down('w'); await page.waitForTimeout(200); await page.keyboard.up('w')
+      await page.waitForTimeout(200)
+    }
+  }
   add('对话面板打开', dialogueOpen)
   if (dialogueOpen) {
     const questBtn = page.locator('.dialogue button.quest', { hasText: '接取任务' }).first()

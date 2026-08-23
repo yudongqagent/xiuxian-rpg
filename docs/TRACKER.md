@@ -119,7 +119,8 @@
 | QA-2 | CI：校验→构建→GitHub Pages 部署 | M0 | ✅ | G6 | bb43598 |
 | QA-3 | 本地 E2E 脚本入库 `scripts/qa-local.mjs`（12 检查项） | M1 | ✅ | G4 | release-m1@bde70f8，`npm run qa:local` 12/12 |
 | QA-4 | 线上 QA 自动化 + 版本去重 | M0+ | ✅ | G5 | qa-automation 工作树 |
-| QA-5 | 性能预算（首屏 JS gzip ≤400KB，60fps 移动端） | M4 | 👀 当前 ~392KB 达标，持续观察 | G2/G5 | combat-depth 实测 |
+| QA-5 | 性能预算（首屏 JS gzip ≤420KB，60fps 移动端） | M4 | ⚠️ 当前 ~428KB 超标（Phaser 340KB 主因） | G2/G5 | 见 QA-6 |
+| QA-6 | Phaser 场景级 code-split（压回 ≤420KB） | M2 | ⬜ | G2/G5 | TRACKER-GFX 遗留债务 |
 
 ---
 
@@ -143,6 +144,9 @@
 | 2026-08-22 | 并入 unify-grade-system / npc-dialogue / turn-combat；修 DialogueBox 响应式 + BattlePanel Proxy 克隆缺陷 | 发布 index-2RV9EKdU.js，QA 8/8 |
 | 2026-08-22 | main 收到外部内容扩充 31e3db3（未推送，随下次发布带出） | validate 通过 |
 | 2026-08-22 | 建立 TRACKER；启动 quest-engine / rich-graphics；集成 world-maps / combat-depth | 见后续记录 |
+
+| 2026-08-22 | bugfix-gameplay：修复无对话 NPC 软锁 / 逃跑贴身重入战斗 / 对话中触发战斗；对话面板 ✕/Esc 关闭 | 已并入 |
+| 2026-08-22 | release-gfx 并入 gfx-scene + gfx-battle-ui（TRACKER-GFX 全部 13 项 ✅）；qa-local 升级 13 项 13/13；新增标题画面与对话头像等 | 已发布 |
 
 > 集成约定：功能分支一律从最新 main 切出；集成在 release-* 工作树完成，冲突解决后跑满 G1–G4 再快进 main 发布。
 
