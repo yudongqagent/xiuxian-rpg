@@ -6,6 +6,15 @@ import type { GameMap } from '../systems/schemas'
 
 type PortalTarget = GameMap['portals'][number]['to']
 import { FRAME, HOUSE_KEY, MAP_ATLAS_KEY, buildMapTileTextures } from './mapTiles'
+// combat-depth：成长/背包状态恢复与战败惩罚
+import {
+  fromPlayerSave,
+  getPlayer,
+  respawnPenalty,
+  setPlayer,
+  toPlayerSave,
+  updatePlayer,
+} from '../systems/player'
 
 const TILE = 32
 const PLAYER_SPEED = 160
@@ -13,6 +22,7 @@ const ENEMY_SPEED = 40
 const ENEMY_WANDER_INTERVAL = 2000
 const INTERACT_RANGE = 80
 const FADE_MS = 350
+const SAVE_VERSION = 2
 
 // ===================================================================
 // 多地图系统（world-maps 分支）：地图来自 content/maps/*.json DSL，
@@ -105,18 +115,23 @@ export class WorldScene extends Phaser.Scene {
     }
     this.player.setPosition(startX, startY)
 
+    // combat-depth：恢复成长/背包/功法（旧档无 player 字段则全新开局）
+    setPlayer(fromPlayerSave(save?.player))
+    bus.emit('player:stats')
+
     this.time.addEvent({
       delay: 5000,
       loop: true,
       callback: () =>
         void writeSave({
-          version: 1,
+          version: SAVE_VERSION,
           playerId: 'mortal-001',
           x: this.player.x,
           y: this.player.y,
           mapId: this.mapId,
           inventory: [],
           savedAt: Date.now(),
+          player: toPlayerSave(getPlayer()),
         }),
     })
 
@@ -303,17 +318,21 @@ export class WorldScene extends Phaser.Scene {
       }),
       bus.on('dialogue:close', () => (this.dialogueOpen = false)),
       bus.on('battle:start', () => (this.battleActive = true)),
-      bus.on('battle:end', ({ win }) => {
+      bus.on('battle:end', ({ win, fled }) => {
         this.battleActive = false
         if (win) {
           this.activeEnemy?.destroy()
-        } else {
+        } else if (!fled) {
+          // 战败（非逃跑）：宽惩罚——气血折半，送回出生点
+          updatePlayer(respawnPenalty)
+          bus.emit('player:stats')
           this.player.setPosition(this.spawnPoint.x, this.spawnPoint.y)
           this.joyVec = { x: 0, y: 0 }
         }
         this.activeEnemy = undefined
       }),
     )
+  }
   }
 
   update(): void {

@@ -3,15 +3,43 @@
  * 运行：npm run check:combat
  */
 import {
+  ENRAGE_ATK_MULT,
+  ENRAGE_THRESHOLD,
+  GRADE_POWER,
   PLAYER_BASE_STATS,
+  POISON_DMG,
+  POISON_TURNS,
   attemptFlee,
+  castSkill,
   createBattle,
+  expReward,
   fleeChance,
   playerAttack,
-  playerSkill,
+  rollLoot,
+  skillEffect,
+  useItem,
   type BattleState,
 } from '../src/systems/combat'
-import type { Enemy } from '../src/systems/schemas'
+import {
+  addItem,
+  createPlayer,
+  expToNext,
+  fromPlayerSave,
+  grantExp,
+  realmLabel,
+  removeItem,
+  respawnPenalty,
+  statsForLevel,
+} from '../src/systems/player'
+import type { Enemy, Item } from '../src/systems/schemas'
+import { SkillSchema } from '../src/systems/schemas'
+import huodanShuJson from '../content/skills/huodan_shu.json'
+import changchunGongJson from '../content/skills/changchun_gong.json'
+import zhayanJianfaJson from '../content/skills/zhayan_jianfa.json'
+
+const huodanShu = SkillSchema.parse(huodanShuJson)
+const changchunGong = SkillSchema.parse(changchunGongJson)
+const zhayanJianfa = SkillSchema.parse(zhayanJianfaJson)
 
 let failures = 0
 function expect(label: string, cond: boolean): void {
@@ -27,6 +55,30 @@ const wolf: Enemy = {
   name: '灰狼',
   description: 'test',
   stats: { hp: 30, atk: 6, def: 2, speed: 4 },
+}
+
+const spider: Enemy = {
+  id: 'du_zhu',
+  name: '毒蛛',
+  description: 'test',
+  stats: { hp: 26, atk: 5, def: 2, speed: 4 },
+  exp: 16,
+  special: 'poison',
+}
+
+const dummy: Enemy = {
+  id: 'test_dummy',
+  name: '木桩妖',
+  description: 'test',
+  stats: { hp: 1000, atk: 0, def: 0, speed: 0 },
+}
+
+const bigBoss: Enemy = {
+  id: 'test_boss',
+  name: '测试凶兽',
+  description: 'test',
+  stats: { hp: 1000, atk: 9, def: 0, speed: 0 },
+  special: 'enrage',
 }
 
 const alwaysMax = () => 1
@@ -53,29 +105,179 @@ expect('玩家攻击锚点为10', PLAYER_BASE_STATS.atk === 10)
   expect('伤害下限为1', wolf.stats.hp - after.enemy.hp === 1)
 }
 
-// 技能：消耗灵气、伤害约1.8倍
+// 技能品阶伤害分层：黄品火弹术(1.8 显式) vs 凡品眨眼剑法(1.5 按 grade 推导)
 {
-  const s = createBattle(wolf)
-  const after = playerSkill(s, alwaysMax)
-  expect('技能消耗8点灵气', s.player.qi - after.player.qi === 8)
-  const skillDmg = wolf.stats.hp - after.enemy.hp
-  expect('技能伤害约16(±2)', skillDmg >= 14 && skillDmg <= 18)
+  expect(
+    '品阶倍率表锚定',
+    GRADE_POWER['凡品'] === 1.5 && GRADE_POWER['黄品'] === 1.8 && GRADE_POWER['玄品'] === 2.3,
+  )
+  const huodan = skillEffect(huodanShu)
+  const zhayan = skillEffect(zhayanJianfa)
+  expect('火弹术=黄品伤害 耗灵8 倍率1.8', huodan.kind === 'damage' && huodan.cost === 8 && huodan.power === 1.8)
+  expect('眨眼剑法缺省推导=凡品伤害 耗灵8 倍率1.5', zhayan.kind === 'damage' && zhayan.cost === 8 && zhayan.power === 1.5)
+
+  const s1 = createBattle(dummy)
+  const d1 = dummy.stats.hp - castSkill(s1, zhayanJianfa, alwaysMax).enemy.hp
+  expect('凡品技能最大伤害=(10-0)*1.5*1.075≈16', d1 === Math.round(10 * 1.5 * 1.075))
+
+  const s2 = createBattle(dummy)
+  const d2 = dummy.stats.hp - castSkill(s2, huodanShu, alwaysMax).enemy.hp
+  expect('黄品技能最大伤害=(10-0)*1.8*1.075≈19', d2 === Math.round(10 * 1.8 * 1.075))
+  expect('黄品伤害严格高于凡品', d2 > d1)
+  expect('施法扣减对应灵气', s1.player.qi - castSkill(s1, zhayanJianfa, alwaysMin).player.qi === 8)
+}
+
+// 回复功法（心法缺省推导为回复）：回血、耗灵；满血时不溢出
+{
+  const hurt = createBattle(wolf)
+  hurt.player.hp = 20
+  const after = castSkill(hurt, changchunGong, alwaysMin)
+  expect(
+    '回复功法耗灵并回血',
+    after.player.hp > 20 && hurt.player.qi - after.player.qi === skillEffect(changchunGong).cost,
+  )
+  const full = createBattle(dummy)
+  full.player.hp = full.player.maxHp
+  const capped = castSkill(full, changchunGong, alwaysMin)
+  expect('满血时回复不溢出(木桩反击为最低1)', capped.player.hp === capped.player.maxHp - 1)
 }
 
 // 灵气不足：不放技能但回合照常推进（受反击）
 {
   let s = createBattle(wolf)
-  while (s.player.qi >= 8 && !s.over) s = playerSkill(s, alwaysMin)
+  while (s.player.qi >= 8 && !s.over) s = castSkill(s, huodanShu, alwaysMin)
   const qiBefore = s.player.qi
   const hpBefore = s.player.hp
-  s = playerSkill(s, alwaysMin)
+  s = castSkill(s, huodanShu, alwaysMin)
   expect('灵气不足时灵气不变', s.player.qi === qiBefore)
   expect('灵气不足仍受敌方反击', s.player.hp < hpBefore || s.over)
 }
 
+// 毒蛛：开局意图提示 → 毒牙上毒 → 每回合 DOT 固定掉血并递减 → 毒可致死
+{
+  const s = createBattle(spider)
+  expect('开局显示敌方意图', s.enemy.intent.length > 0)
+  expect('奇数回合意图为毒牙嘶咬', s.enemy.intent.includes('毒'))
+  let next = playerAttack(s, alwaysMax)
+  expect('中毒进入倒计时', !next.over && next.player.poison === POISON_TURNS)
+  expect('敌方行动后意图轮换为普攻', !next.enemy.intent.includes('毒'))
+  const hpAfterBite = next.player.hp
+  next = playerAttack(next, alwaysMax)
+  expect(
+    '每回合毒素固定掉血(毒3+普攻反击)',
+    hpAfterBite - next.player.hp === POISON_DMG + Math.round((spider.stats.atk - spider.stats.def / 2) * 1.075),
+  )
+  expect('毒倒计时递减', next.player.poison === POISON_TURNS - 1)
+
+  const doomed = createBattle(spider)
+  doomed.player.hp = 6
+  let dead = playerAttack(doomed, alwaysMax)
+  dead = playerAttack(dead, alwaysMax)
+  expect('毒素可致死且判负', dead.over && !dead.win && dead.player.hp === 0)
+}
+
+// Boss 狂暴：血量跌破 30% 后 atk 提升 ENRAGE_ATK_MULT 倍，仅触发一次；意图同步变化
+{
+  const s = createBattle(bigBoss)
+  expect('满血时未狂暴', s.enemy.atk === bigBoss.stats.atk)
+  s.enemy.hp = Math.ceil(bigBoss.stats.hp * ENRAGE_THRESHOLD) + 1
+  const after = playerAttack(s, alwaysMax)
+  expect(
+    '跌破30%触发狂暴且攻击提升',
+    after.enemy.atk === Math.round(bigBoss.stats.atk * ENRAGE_ATK_MULT),
+  )
+  expect('狂暴后意图提示暴烈', after.enemy.intent.includes('狂怒') || after.over)
+  expect('再次攻击不重复叠加', after.over || playerAttack(after, alwaysMax).enemy.atk === after.enemy.atk)
+}
+
+// 经验曲线：递增、升级结算与余量滚存、境界称谓、属性成长、敌人经验来源
+{
+  expect('经验需求随等级递增', expToNext(1) < expToNext(2) && expToNext(2) < expToNext(3))
+  expect('一级升二级需30经验', expToNext(1) === 30)
+  const p0 = createPlayer()
+  const r1 = grantExp(p0, expToNext(1) + 5)
+  expect('升级且余量滚存', r1.levelsGained === 1 && r1.player.level === 2 && r1.player.exp === 5)
+  const s1 = statsForLevel(1)
+  const s2 = statsForLevel(2)
+  expect('升级属性成长', s2.maxHp > s1.maxHp && s2.atk > s1.atk && s2.def >= s1.def && s2.speed >= s1.speed)
+  const wounded = { ...p0, hp: 1 }
+  expect('升级回复部分气血', grantExp(wounded, expToNext(1)).player.hp > wounded.hp)
+  expect(
+    '境界称谓派生自等级',
+    realmLabel(1) === '炼气一层' &&
+      realmLabel(3) === '炼气三层' &&
+      realmLabel(12) === '炼气十二层' &&
+      realmLabel(13) === '炼气十三层·圆满' &&
+      realmLabel(99) === '炼气十三层·圆满',
+  )
+  expect(
+    '敌人经验取自模板或按stats推导',
+    expReward(spider) === 16 && expReward(wolf) === Math.round((30 + 12 + 2) / 5),
+  )
+}
+
+// 掉落表边界：必掉(chance=1)/不掉(chance=0)/概率掷点/空表
+{
+  const table = [
+    { item: 'yaodan', chance: 1 },
+    { item: 'xi_sui_dan', chance: 0.5 },
+    { item: 'never', chance: 0 },
+  ]
+  expect('rng=0 时必掉+半掉命中', rollLoot(table, () => 0).join(',') === 'yaodan,xi_sui_dan')
+  expect('rng≥0.5 时只掉必掉项', rollLoot(table, () => 0.5).join(',') === 'yaodan')
+  expect('空表不掉落', rollLoot(undefined, () => 0).length === 0)
+}
+
+// 背包增删 + 战败宽惩罚 + 旧档兼容
+{
+  const p = addItem(createPlayer(), 'huiqi_san', 2)
+  expect('物品入库计数', p.inventory['huiqi_san'] === 5)
+  const q = removeItem(p, 'huiqi_san', 5)
+  expect('物品出清后移除键', q.inventory['huiqi_san'] === undefined)
+  expect('数量不足时不消耗', removeItem(p, 'huiqi_san', 99).inventory['huiqi_san'] === 5)
+  const beaten = respawnPenalty({ ...createPlayer(), hp: 3 })
+  expect('战败气血折半而非归零', beaten.hp === Math.ceil(statsForLevel(beaten.level).maxHp / 2))
+  const legacy = fromPlayerSave(undefined)
+  expect('旧档兼容：无player字段按全新开局', legacy.level === 1 && legacy.skills.includes('huodan_shu'))
+  const carried = fromPlayerSave({
+    level: 3,
+    exp: 7,
+    hp: 999,
+    qi: -5,
+    inventory: { yaodan: 2 },
+    skills: ['changchun_gong'],
+  })
+  expect(
+    '读档钳制非法数值并合并缺省',
+    carried.level === 3 &&
+      carried.exp === 7 &&
+      carried.hp === statsForLevel(3).maxHp &&
+      carried.qi === 0 &&
+      carried.inventory['yaodan'] === 2 &&
+      carried.skills.includes('huodan_shu'),
+  )
+}
+
+// 战斗用道具：回血生效且消耗一回合（受反击）
+{
+  const potion: Item = {
+    id: 'huichun_san',
+    name: '回春散',
+    type: 'consumable',
+    grade: '凡品',
+    description: '',
+    stats: {},
+    effect: { hp: 30 },
+  }
+  const s = createBattle(wolf)
+  s.player.hp = 10
+  const after = useItem(s, potion, alwaysMin)
+  expect('丹药回血且回合推进受反击', after.player.hp > 10 && after.player.hp < after.player.maxHp)
+}
+
 // 击杀流程：连续攻击至敌方归零 → over=true, win=true
 {
-  let s: BattleState = createBattle(wolf, alwaysMin)
+  let s: BattleState = createBattle(wolf, {}, alwaysMin)
   while (!s.over) s = playerAttack(s, alwaysMin)
   expect('击杀后战斗结束且胜利', s.over && s.win && s.enemy.hp === 0)
 }
@@ -83,20 +285,20 @@ expect('玩家攻击锚点为10', PLAYER_BASE_STATS.atk === 10)
 // 战败流程：构造远强于玩家的敌人
 {
   const demon: Enemy = { ...wolf, id: 'test_demon', stats: { hp: 1000, atk: 60, def: 30, speed: 99 } }
-  const s = createBattle(demon, alwaysMax)
+  const s = createBattle(demon, {}, alwaysMax)
   expect('速度高者开局抢先手', s.player.hp < s.player.maxHp)
 
-  let dead: BattleState = createBattle(demon, alwaysMax)
+  let dead: BattleState = createBattle(demon, {}, alwaysMax)
   while (!dead.over) dead = playerAttack(dead, alwaysMax)
   expect('战败时 over 且未胜利', dead.over && !dead.win && dead.player.hp === 0)
 }
 
-// 逃跑：成功率随速度差，成功即结束；失败受反击
+// 逃跑：成功率随速度差，成功即结束(fled)；失败受反击
 {
   const fastPlayerState = createBattle(wolf)
   expect('逃跑率=基础+速度差加成', Math.abs(fleeChance(fastPlayerState) - 0.65) < 1e-9)
   const fled = attemptFlee(createBattle(wolf), () => 0.1)
-  expect('低随机值逃跑成功', fled.over && !fled.win)
+  expect('低随机值逃跑成功', fled.over && fled.fled)
   const stuck = attemptFlee(createBattle(wolf), () => 0.99)
   expect('逃跑失败继续战斗并受反击', !stuck.over && stuck.player.hp < stuck.player.maxHp)
 }

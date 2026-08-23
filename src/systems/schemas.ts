@@ -59,6 +59,16 @@ export const SkillSchema = z.object({
     }),
   ),
   description: z.string().max(300),
+  /** 战斗效果；缺省时由 kind/grade 推导（伤害/回复/增益） */
+  battle: z
+    .object({
+      kind: z.enum(['damage', 'heal', 'buff']),
+      cost: z.number().int().min(0).max(99),
+      power: z.number().min(0).max(99).optional(),
+      amount: z.number().int().min(0).max(999).optional(),
+      turns: z.number().int().min(1).max(9).optional(),
+    })
+    .optional(),
 })
 
 export const NpcSchema = z.object({
@@ -111,6 +121,20 @@ export const EnemySchema = z.object({
     def: z.number().int().min(0),
     speed: z.number().int().min(0).max(99),
   }),
+  /** 击杀经验；缺省时按 stats 推导 */
+  exp: z.number().int().min(0).max(9999).optional(),
+  /** 特殊行为：毒伤 DOT / 低血狂暴 */
+  special: z.enum(['poison', 'enrage']).optional(),
+  /** 掉落表，chance ∈ [0,1] */
+  loot: z
+    .array(
+      z.object({
+        item: z.string(),
+        chance: z.number().min(0).max(1),
+      }),
+    )
+    .max(6)
+    .optional(),
 })
 
 export const QuestStepSchema = z.discriminatedUnion('kind', [

@@ -1,0 +1,12 @@
+{
+  "id": "ye_zhu_wang",
+  "name": "野猪王",
+  "description": "彩霞山猪群之王，皮糙肉厚、獠牙如刀。一旦见血便狂性大发，攻势暴烈难挡——传说它窝里压着不少过路修士的好东西。",
+  "stats": { "hp": 95, "atk": 9, "def": 4, "speed": 3 },
+  "exp": 60,
+  "special": "enrage",
+  "loot": [
+    { "item": "yaodan", "chance": 1 },
+    { "item": "xi_sui_dan", "chance": 0.5 }
+  ]
+}
