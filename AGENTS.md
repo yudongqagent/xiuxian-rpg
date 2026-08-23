@@ -30,6 +30,8 @@ Follow the conventions defined there.
 
 ## Lessons
 
+- 增量类型检查可能漏报：改动被 `as unknown as X` 强转消费的结构（如 validate.ts 的 RawMap）或任何跨文件字段时，先删 `tsconfig.tsbuildinfo` 再 `npm run build`，确保与 CI 一致的干净全量类型检查。
+
 When an agent makes a real mistake that the docs do not cover, add a concise
 rule here or in the relevant doc so future sessions don't repeat it. Keep this
 file short (~40 lines) — details belong in `docs/`.

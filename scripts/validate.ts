@@ -54,6 +54,7 @@ interface RawMap {
   npcPlacements: Array<{ npcId: string; x: number; y: number }>
   enemySpawns: Array<{ enemyId: string; x: number; y: number }>
   props?: Array<{ type: string; x: number; y: number }>
+  regionId?: string
 }
 
 function tileWalkable(rows: string[], x: number, y: number): boolean {
