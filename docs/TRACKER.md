@@ -57,7 +57,7 @@
 | MAP-4 | 密林妖谷（妖兽区） | M1 | ✅ | G1/G4 | world-maps |
 | MAP-5 | portal 场景切换 + 出生点定位 + 存档恢复地图 | M1 | ✅ | G4 | qa-local 12/12 |
 | MAP-6 | Tiled 编辑器导入管线 | M1+ | ⬜（JSON DSL 先行替代） | G1 | — |
-| MAP-7 | 人界篇全域地图量产（10+ 区域） | M3 | 🚧 ch5-6 maps delivered (yuejiang_zhanchang/shanggu_dongfu) — 主线六章全通 | G1/G4 | maps-ch56 |
+| MAP-7 | 人界篇全域地图量产 | M3 | ✅ 主线六章全通：村/山道/妖谷/黄枫谷/血色塔/越疆战场/上古洞府 七图互通；支线区域图随支线扩展 | G1/G4 | maps-ch34@1303fc2 + maps-ch56@8e48593 |
 
 ### D. NPC 与对话 `src/systems/dialogues.ts` `src/ui/DialogueBox.vue`
 
@@ -66,7 +66,7 @@
 | DIA-1 | 对话树 JSON DSL + zod schema + 校验 | M1 | ✅ | G1 | npc-dialogue 已并入 main |
 | DIA-2 | NPC 交互（E 键/点击 + 距离提示） | M1 | ✅ | G4 | 同上 |
 | DIA-3 | 对话浮层（选项/继续/键盘操作） | M1 | ✅（修复响应式缺陷后） | G4 | main @81a94ef |
-| DIA-4 | 对话内容量产（全部可交互 NPC 有对话） | M3 | 🚧 村庄 4 NPC + 山道老人已绑定，其余待地图铺开 | G1/G4 | world-maps |
+| DIA-4 | 对话内容量产（全部可交互 NPC 有对话） | M3 | ✅ 所有已放置 NPC（11 名）均有对话树 | G1/G4 | world-maps + feat-shop + maps-ch34/ch56 |
 
 ### E. 战斗系统 `src/systems/combat.ts` `src/ui/BattlePanel.vue`
 
@@ -90,7 +90,7 @@
 | QST-3 | 触发器接线（对话/击杀/采集/到达 → 进度事件） | M1 | ✅ | G4 | bus 触发统一队列 |
 | QST-4 | 任务日志 UI（三 Tab）+ HUD 追踪条 + toast | M1 | ✅ | G4 | qa-local 实测接取 qm_01 |
 | QST-5 | 主线前六章链路校验（前置环环相扣） | M1 | ✅（E2E 覆盖首章；二~六章待内容地图后全通） | G3/G4 | check:quest 链路用例 |
-| QST-6 | 四章主线 + 30 支线内容量产 | M3 | 🚧 内容池已扩充（16 条），持续补充 | G1 | 31e3db3 |
+| QST-6 | 六章主线 + 支线内容 | M3 | ✅ 主线 qm_01→qm_06 全链路可玩（地图/NPC/妖兽/掉落全通）；支线 16 条已入库可接 | G1/G4 | 31e3db3 + maps-ch34/ch56 |
 
 ### G. 物品/背包/装备/炼丹 `InventoryPanel.vue` `systems/player.ts`
 
@@ -182,6 +182,8 @@
 | 2026-08-22 | feat-regions：地图 DSL 增加 regionId 并随 area:enter 上报——qm_02「抵达彩霞山脉」可达，主线第二章节链路打通；山道瀑布点亮 GFX2-B4 | 已发布 |
 
 | 2026-08-22 | feat-combo：CBT-8 连携技落地（combat 纯函数 + 面板提示）；系统类条目全部完成，剩余为内容量产 | 已发布 |
+
+| 2026-08-22 | maps-ch56：越疆战场/上古洞府落地——主线六章全链路可玩，MAP-7 主线/QST-6 主线/DIA-4 完成 | 已发布 |
 
 > 集成约定：功能分支一律从最新 main 切出；集成在 release-* 工作树完成，冲突解决后跑满 G1–G4 再快进 main 发布。
 
