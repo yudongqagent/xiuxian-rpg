@@ -8,6 +8,8 @@ import BattlePanel from './ui/BattlePanel.vue'
 import AreaBanner from './ui/AreaBanner.vue'
 import QuestLog from './ui/QuestLog.vue'
 import QuestToast from './ui/QuestToast.vue'
+import TitleSplash from './ui/TitleSplash.vue'
+import BattleTransition from './ui/BattleTransition.vue'
 import { createGame } from './engine/game'
 import { initQuestRuntime } from './systems/questRuntime'
 
@@ -38,6 +40,8 @@ onUnmounted(() => {
     <BattlePanel />
     <AreaBanner />
     <QuestToast />
+    <BattleTransition />
+    <TitleSplash />
   </div>
 </template>
 

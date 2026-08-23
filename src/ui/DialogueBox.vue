@@ -4,11 +4,13 @@ import { bus } from '../engine/eventBus'
 import { getDialogueByNpc } from '../systems/dialogues'
 import type { Dialogue } from '../systems/schemas'
 import { getQuestDialogueActions, type DialogueAction } from '../systems/questRuntime'
+import { portraitFor } from './portraits'
 
 const view = ref<{ dialogue: Dialogue; nodeId: string } | null>(null)
 
 const node = computed(() => view.value?.dialogue.nodes.find((n) => n.id === view.value?.nodeId))
 const choices = computed(() => node.value?.choices ?? [])
+const portraitUrl = computed(() => (view.value ? portraitFor(view.value.dialogue.npcId) : ''))
 
 const questVersion = ref(0)
 const questActions = computed<DialogueAction[]>(() => {
@@ -73,19 +75,26 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div v-if="node" class="dialogue">
+  <div v-if="node" class="dialogue ink-sheet">
     <button class="close" aria-label="关闭" @click="close">✕</button>
-    <div class="speaker">{{ node.speaker }}</div>
-    <p class="text">{{ node.text }}</p>
-    <div v-if="choices.length || questActions.length" class="choices">
-      <button v-for="a in questActions" :key="a.questId" class="quest" @click="runQuestAction(a)">
-        <i>◆</i>{{ a.label }}
-      </button>
-      <button v-for="(c, i) in choices" :key="i" @click="choose(i)">
-        <i>{{ i + 1 }}.</i>{{ c.text }}
-      </button>
+    <div class="body">
+      <div :key="node.id" class="portrait-col">
+        <img class="portrait" :src="portraitUrl" :alt="node.speaker" draggable="false" />
+        <span class="plate">{{ node.speaker }}</span>
+      </div>
+      <div class="text-col">
+        <p class="text">{{ node.text }}</p>
+        <div v-if="choices.length || questActions.length" class="choices">
+          <button v-for="a in questActions" :key="a.questId" class="quest" @click="runQuestAction(a)">
+            <i>◆</i>{{ a.label }}
+          </button>
+          <button v-for="(c, i) in choices" :key="i" @click="choose(i)">
+            <i>{{ i + 1 }}.</i>{{ c.text }}
+          </button>
+        </div>
+        <button v-else class="continue" @click="close">继续 [E]</button>
+      </div>
     </div>
-    <button v-else class="continue" @click="close">继续 [E]</button>
   </div>
 </template>
 
@@ -93,15 +102,13 @@ onUnmounted(() => {
 .dialogue {
   position: fixed;
   inset: auto 0 0 0;
-  background: rgba(20, 14, 9, 0.96);
-  border-top: 1px solid #8b6914;
-  color: #e8dcc0;
-  padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
+  padding: 14px 16px calc(16px + env(safe-area-inset-bottom));
 }
 .close {
   position: absolute;
   top: 8px;
   right: 10px;
+  z-index: 1;
   min-width: 32px;
   min-height: 32px;
   border: 1px solid rgba(139, 105, 20, 0.5);
@@ -110,13 +117,57 @@ onUnmounted(() => {
   color: #e8dcc0;
   font-size: 14px;
 }
-.speaker {
+.body {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+.portrait-col {
+  position: relative;
+  flex: none;
+  width: 84px;
+  animation: portrait-bob 1.15s ease-in-out infinite alternate;
+}
+@keyframes portrait-bob {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-4px);
+  }
+}
+.portrait {
+  display: block;
+  width: 84px;
+  height: 84px;
+  border-radius: 10px;
+  border: 1px solid rgba(201, 164, 74, 0.55);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 3px 12px rgba(0, 0, 0, 0.5);
+}
+.plate {
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  padding: 2px 10px;
+  border: 1px solid rgba(139, 105, 20, 0.8);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #33270f, #241a0a);
   color: #ffd97a;
-  font-size: 14px;
-  margin-bottom: 6px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+.text-col {
+  flex: 1;
+  min-width: 0;
 }
 .text {
-  margin: 0 0 10px;
+  margin: 6px 0 10px;
   font-size: 15px;
   line-height: 1.6;
 }
@@ -125,7 +176,8 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 8px;
 }
-button {
+.choices button,
+.continue {
   text-align: left;
   min-height: 44px;
   border: 1px solid rgba(139, 105, 20, 0.5);
@@ -135,16 +187,25 @@ button {
   color: inherit;
   font-size: 14px;
 }
-button i {
+.choices button i {
   font-style: normal;
   color: #ffd97a;
   margin-right: 8px;
 }
-button.quest {
+.choices button.quest {
   border-color: #ffd97a;
 }
 .continue {
   align-self: flex-end;
   opacity: 0.85;
+}
+@media (max-width: 380px) {
+  .portrait-col {
+    width: 64px;
+  }
+  .portrait {
+    width: 64px;
+    height: 64px;
+  }
 }
 </style>
