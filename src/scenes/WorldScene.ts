@@ -15,6 +15,8 @@ import {
   toPlayerSave,
   updatePlayer,
 } from '../systems/player'
+// quest-engine：任务进度恢复与入档
+import { restoreQuests, snapshotQuests } from '../systems/questRuntime'
 
 const TILE = 32
 const PLAYER_SPEED = 160
@@ -118,6 +120,8 @@ export class WorldScene extends Phaser.Scene {
     // combat-depth：恢复成长/背包/功法（旧档无 player 字段则全新开局）
     setPlayer(fromPlayerSave(save?.player))
     bus.emit('player:stats')
+    // quest-engine：恢复任务进度
+    restoreQuests(save?.quests)
 
     this.time.addEvent({
       delay: 5000,
@@ -132,6 +136,7 @@ export class WorldScene extends Phaser.Scene {
           inventory: [],
           savedAt: Date.now(),
           player: toPlayerSave(getPlayer()),
+          quests: snapshotQuests(),
         }),
     })
 

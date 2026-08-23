@@ -1,4 +1,5 @@
 /** 存档系统：IndexedDB 单存档位 + 自动保存。后续可扩展多存档位/云同步。 */
+import type { QuestSaveData } from '../systems/quests'
 
 const DB_NAME = 'xiuxian-save'
 const STORE = 'slots'
@@ -34,6 +35,8 @@ export interface SaveData {
   savedAt: number
   /** v2 起携带成长/背包/功法；旧档缺省时按全新炼气一层处理（向后兼容） */
   player?: PlayerSave
+  /** quest-engine 新增：任务进度（additive 可选，旧存档无此字段） */
+  quests?: QuestSaveData
 }
 
 export async function loadSave(): Promise<SaveData | null> {

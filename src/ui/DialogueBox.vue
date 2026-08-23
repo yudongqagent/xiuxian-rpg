@@ -3,11 +3,22 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { bus } from '../engine/eventBus'
 import { getDialogueByNpc } from '../systems/dialogues'
 import type { Dialogue } from '../systems/schemas'
+import { getQuestDialogueActions, type DialogueAction } from '../systems/questRuntime'
 
 const view = ref<{ dialogue: Dialogue; nodeId: string } | null>(null)
 
 const node = computed(() => view.value?.dialogue.nodes.find((n) => n.id === view.value?.nodeId))
 const choices = computed(() => node.value?.choices ?? [])
+
+const questVersion = ref(0)
+const questActions = computed<DialogueAction[]>(() => {
+  void questVersion.value
+  return view.value ? getQuestDialogueActions(view.value.dialogue.npcId) : []
+})
+
+function runQuestAction(a: DialogueAction): void {
+  bus.emit(a.kind === 'offer' ? 'quest:offer' : 'quest:turnin', { questId: a.questId })
+}
 
 function open(npcId: string): void {
   const d = getDialogueByNpc(npcId)
@@ -38,9 +49,11 @@ function onKey(e: KeyboardEvent): void {
 }
 
 const unOpen = bus.on('dialogue:open', ({ npcId }) => open(npcId))
+const unQuest = bus.on('quest:updated', () => questVersion.value++)
 onMounted(() => window.addEventListener('keydown', onKey))
 onUnmounted(() => {
   unOpen()
+  unQuest()
   window.removeEventListener('keydown', onKey)
 })
 </script>
@@ -49,7 +62,10 @@ onUnmounted(() => {
   <div v-if="node" class="dialogue">
     <div class="speaker">{{ node.speaker }}</div>
     <p class="text">{{ node.text }}</p>
-    <div v-if="choices.length" class="choices">
+    <div v-if="choices.length || questActions.length" class="choices">
+      <button v-for="a in questActions" :key="a.questId" class="quest" @click="runQuestAction(a)">
+        <i>◆</i>{{ a.label }}
+      </button>
       <button v-for="(c, i) in choices" :key="i" @click="choose(i)">
         <i>{{ i + 1 }}.</i>{{ c.text }}
       </button>
@@ -96,6 +112,9 @@ button i {
   font-style: normal;
   color: #ffd97a;
   margin-right: 8px;
+}
+button.quest {
+  border-color: #ffd97a;
 }
 .continue {
   align-self: flex-end;
