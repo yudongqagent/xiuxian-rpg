@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { bus } from '../engine/eventBus'
 import { loadSave, writeSave } from '../engine/save'
+import { restoreQuests, snapshotQuests } from '../systems/questRuntime' // quest-engine
 
 const TILE = 32
 const PLAYER_SPEED = 160
@@ -159,6 +160,7 @@ export class WorldScene extends Phaser.Scene {
     // 存档恢复 + 自动保存
     void loadSave().then((save) => {
       if (save) this.player.setPosition(save.x, save.y)
+      restoreQuests(save?.quests) // quest-engine: 恢复任务进度
       this.time.addEvent({
         delay: 5000,
         loop: true,
@@ -170,6 +172,7 @@ export class WorldScene extends Phaser.Scene {
             y: this.player.y,
             inventory: [],
             savedAt: Date.now(),
+            quests: snapshotQuests(), // quest-engine: 任务进度入档
           }),
       })
     })

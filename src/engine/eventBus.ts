@@ -1,4 +1,5 @@
 import type { JoystickVector } from './joystickTypes'
+import type { QuestSaveData, QuestStatus } from '../systems/quests'
 
 type GameEvents = {
   /** 摇杆输入向量，长度 0~1 */
@@ -13,8 +14,22 @@ type GameEvents = {
   'battle:start': { enemyId: string }
   /** UI 层玩家指令 */
   'battle:action': 'attack' | 'skill' | 'flee'
-  /** 战斗收尾：win=胜利；false 含战败与逃跑 */
-  'battle:end': { win: boolean }
+  /** 战斗收尾：win=胜利；false 含战败与逃跑。enemyId 由战斗面板回传（任务击杀目标用） */
+  'battle:end': { win: boolean; enemyId?: string }
+  /** 物品入包（拾取/掉落/奖励统一入口），count 缺省为 1 */
+  'item:acquired': { itemId: string; count?: number }
+  /** 进入区域（world-maps 区域横幅处触发） */
+  'area:enter': { regionId: string }
+  /** 任务状态迁移通知 */
+  'quest:updated': { questId: string; status: QuestStatus }
+  /** 任务提示 toast */
+  'quest:notify': { text: string; kind?: 'info' | 'success' }
+  /** 接取任务请求 */
+  'quest:offer': { questId: string }
+  /** 交付任务请求 */
+  'quest:turnin': { questId: string }
+  /** 经验产出（成长系统接入前由任务奖励发出） */
+  'reward:exp': { expQi: number }
 }
 
 /** Vue UI 与 Phaser 世界之间唯一通信通道 */

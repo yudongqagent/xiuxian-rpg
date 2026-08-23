@@ -17,9 +17,11 @@ const SKILL_COST_HINT = 8
 
 const active = ref(false)
 const state = ref<BattleState | null>(null)
+let enemyId: string | undefined
 
-const unsubStart = bus.on('battle:start', ({ enemyId }) => {
-  const template = EnemySchema.parse(TEMPLATES[enemyId])
+const unsubStart = bus.on('battle:start', ({ enemyId: id }) => {
+  enemyId = id
+  const template = EnemySchema.parse(TEMPLATES[id])
   state.value = createBattle(template)
   active.value = true
 })
@@ -37,7 +39,7 @@ function act(action: BattleAction): void {
 
 function close(): void {
   if (!state.value) return
-  bus.emit('battle:end', { win: state.value.win })
+  bus.emit('battle:end', { win: state.value.win, enemyId })
   active.value = false
   state.value = null
 }
