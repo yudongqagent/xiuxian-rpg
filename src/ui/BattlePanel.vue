@@ -38,12 +38,25 @@ import huiqiSan from '../../content/items/huiqi_san.json'
 import huichunSan from '../../content/items/huichun_san.json'
 import xiSuiDan from '../../content/items/xi_sui_dan.json'
 
-const ENEMY_TEMPLATES: Record<string, Enemy> = Object.fromEntries(
-  [huiLang, shanXiao, duZhu, yeZhuWang].map((raw) => {
-    const e = EnemySchema.parse(raw)
-    return [e.id, e]
-  }),
+// 全量加载妖兽模板（新增内容零登记即可入战），不再手工枚举
+const ENEMY_MODULE_ENTRIES = Object.entries(
+  import.meta.glob('../../content/enemies/*.json', { eager: true }) as Record<string, unknown>,
 )
+const ENEMY_TEMPLATES: Record<string, Enemy> = {}
+for (const [path, raw] of ENEMY_MODULE_ENTRIES) {
+  const id = path.split('/').pop()!.replace(/\.json$/, '')
+  try {
+    ENEMY_TEMPLATES[id] = EnemySchema.parse(raw)
+  } catch (e) {
+    console.error(`[battle] 妖兽模板解析失败: ${id}`, e)
+  }
+}
+/** 兜底模板：内容缺失时也绝不中断战斗流程 */
+function fallbackEnemy(enemyId: string): Enemy {
+  console.error(`[battle] 未知妖兽 "${enemyId}"，使用兜底模板`)
+  const base = ENEMY_TEMPLATES['hui_lang'] ?? Object.values(ENEMY_TEMPLATES)[0]
+  return { ...base, id: 'unknown', name: '未知妖兽' }
+}
 const SKILL_BOOK: Record<string, Skill> = Object.fromEntries(
   [huodanShu, changchunGong, zhayanJianfa].map((raw) => {
     const s = SkillSchema.parse(raw)
@@ -125,8 +138,7 @@ let battleEnemyId: string | undefined
 
 const unsubStart = bus.on('battle:start', ({ enemyId }) => {
   battleEnemyId = enemyId
-  const template = ENEMY_TEMPLATES[enemyId]
-  if (!template) throw new Error(`未知妖兽: ${enemyId}`)
+  const template = ENEMY_TEMPLATES[enemyId] ?? fallbackEnemy(enemyId)
   const p = getPlayer()
   const stats = statsForLevel(p.level)
   // combat.ts 内部用 structuredClone，不能传入响应式 Proxy
@@ -138,6 +150,7 @@ const unsubStart = bus.on('battle:start', ({ enemyId }) => {
   floaters.value = []
   clearFxTimers()
   busy.value = false
+  bus.emit('battle:opened')
   firing.value = false
   bursting.value = false
   active.value = true

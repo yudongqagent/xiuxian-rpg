@@ -150,6 +150,23 @@
 
 | 2026-08-22 | perf-codesplit：Phaser 懒加载落地，首屏 gzip 65KB；qa-local 适配重载流程 13/13 | 已发布 |
 
+| 2026-08-22 | hotfix-battle：修复遭遇铁背狼/雾影莽/野狼帮众必软锁（模板全量化+兜底）；防御三层（bus 单处理器隔离 / battle:opened 确认 + 1.5s 看门狗强制解锁 / 战斗与转场期间暂停自动存档）；对抗性 playtest 报告 10 项发现全部入库 | 已发布 |
+
+### 对抗性 playtest 发现（2026-08-22，生产环境实测）
+
+| ID | 严重度 | 问题 | 状态 |
+|---|---|---|---|
+| PT-1 | critical | 遭遇未登记妖兽即软锁（BattlePanel 手工注册表缺 3 只） | ✅ hotfix-battle |
+| PT-2 | critical | qm_01 第一步 NPC 岳堂主无地图摆放，主线死锁 | ⬜ P0 下轮 |
+| PT-3 | major | 水面可行走（'~' 无碰撞体） | ⬜ P0 下轮 |
+| PT-4 | major | 七叶灵草无可获取来源（毒蛛不在任何地图刷新） | ⬜ P0 下轮 |
+| PT-5 | minor | 任务面板被对话面板遮挡（z-order） | ⬜ |
+| PT-6 | minor | 切窗后按键状态残留（blur 未清键） | ⬜ |
+| PT-7 | minor | 战斗中重载→落点即再入战斗（自动存档暂停已缓解） | ✅ 缓解(hotfix) |
+| PT-8 | minor | 逃跑成功需二次点击且击退过远 | ⬜ |
+| PT-9 | nit | 宽屏下地图右缘露天空隙 | ⬜ |
+| PT-10 | nit | 简报笔误 五叶/七叶灵草 | ✅ 文档层面 |
+
 > 集成约定：功能分支一律从最新 main 切出；集成在 release-* 工作树完成，冲突解决后跑满 G1–G4 再快进 main 发布。
 
 | 2026-08-22 | release-m1 集成四分支：world-maps→combat-depth→quest-engine→rich-graphics；修 5 处冲突 + 3 处集成缺陷（validate 地图块丢失、WorldScene 括号、area:enter 可选 regionId）；qa-local.mjs 入库并 12/12 通过 | 待发布 |

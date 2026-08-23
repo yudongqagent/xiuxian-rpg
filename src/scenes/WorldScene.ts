@@ -82,6 +82,7 @@ export class WorldScene extends Phaser.Scene {
   private ready = false
   private transitioning = false
   private battleGraceUntil = 0
+  private battleAcked = false
   // ==== rich-graphics ====
   private heroDust: { setMoving: (moving: boolean) => void } | null = null
   private heroDir: 'down' | 'up' | 'side' = 'down'
@@ -203,7 +204,8 @@ export class WorldScene extends Phaser.Scene {
     this.time.addEvent({
       delay: 5000,
       loop: true,
-      callback: () =>
+      callback: () => {
+        if (this.battleActive || this.transitioning) return
         void writeSave({
           version: SAVE_VERSION,
           playerId: 'mortal-001',
@@ -214,7 +216,8 @@ export class WorldScene extends Phaser.Scene {
           savedAt: Date.now(),
           player: toPlayerSave(getPlayer()),
           quests: snapshotQuests(),
-        }),
+        })
+      }
     })
 
     this.time.addEvent({
@@ -415,7 +418,18 @@ export class WorldScene extends Phaser.Scene {
           this.prompt.setVisible(false)
         }
       }),
-      bus.on('battle:start', () => (this.battleActive = true)),
+      bus.on('battle:start', () => {
+        this.battleActive = true
+        this.battleAcked = false
+        this.time.delayedCall(1500, () => {
+          if (this.battleActive && !this.battleAcked) {
+            console.error('[world] 战斗 UI 未确认打开，看门狗强制解除锁定')
+            this.battleActive = false
+            this.battleGraceUntil = this.time.now + 1000
+          }
+        })
+      }),
+      bus.on('battle:opened', () => (this.battleAcked = true)),
       bus.on('battle:end', ({ win, fled }) => {
         this.battleActive = false
         // 战斗结束后短暂免遭遇窗口，防止贴身妖兽瞬间再开战
@@ -502,6 +516,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private tryInteract(): void {
+    if (this.transitioning || this.battleActive) return
     const near = this.nearestNpc()
     if (!near || this.dialogueOpen) return
     bus.emit('dialogue:open', { npcId: near.id })

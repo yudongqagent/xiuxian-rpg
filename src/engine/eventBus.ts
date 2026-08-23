@@ -17,6 +17,7 @@ type GameEvents = {
   /** UI 层玩家指令 */
   'battle:action': 'attack' | 'skill' | 'flee'
   /** 战斗收尾：win=胜利；false 含战败与逃跑；enemyId 由战斗面板回传（任务击杀目标用） */
+  'battle:opened': void
   'battle:end': { win: boolean; fled?: boolean; enemyId?: string }
   /** 进入新地图：name 供区域横幅，regionId 供任务到达类目标 */
   'area:enter': { name: string; regionId?: string }
@@ -45,6 +46,13 @@ export const bus = new (class {
     return () => this.m.get(k)?.delete(fn as never)
   }
   emit<K extends keyof GameEvents>(k: K, p?: GameEvents[K]): void {
-    this.m.get(k)?.forEach((fn) => fn(p as never))
+    this.m.get(k)?.forEach((fn) => {
+      try {
+        fn(p as never)
+      } catch (e) {
+        // 防御：单个监听器异常只记录，不中断其余流程（防软锁扩散）
+        console.error(`[bus] 事件 ${String(k)} 的处理器异常`, e)
+      }
+    })
   }
 })()
