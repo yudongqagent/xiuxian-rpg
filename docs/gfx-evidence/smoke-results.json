@@ -1,55 +1,54 @@
 {
   "results": [
     {
-      "name": "world-renders",
-      "pass": true,
-      "detail": ""
-    },
-    {
-      "name": "C1 petals drifting (pixel diff)",
-      "pass": true,
-      "detail": "ratio=0.0084"
-    },
-    {
-      "name": "B3 parallax moves while walking (pixel diff)",
-      "pass": true,
-      "detail": "ratio=0.0369"
-    },
-    {
-      "name": "portal to shanji",
+      "name": "出村 portal（七玄门→山道）",
       "pass": true,
       "detail": "{\"x\":18,\"y\":2}"
     },
     {
-      "name": "B4 stream bands animate (pixel diff)",
+      "name": "山道东 portal（→黄枫谷）",
       "pass": true,
-      "detail": "ratio=0.1172"
+      "detail": "{\"x\":19,\"y\":2}"
     },
     {
-      "name": "C1 leaves tumbling (pixel diff)",
+      "name": "黄枫谷新 portal（南·越疆战场）",
       "pass": true,
-      "detail": "ratio=0.0101"
+      "detail": "{\"x\":12,\"y\":25}"
     },
     {
-      "name": "portal to yaogu",
+      "name": "越疆战场 进场横幅",
       "pass": true,
-      "detail": "{\"x\":2,\"y\":14}"
+      "detail": "越疆战场"
     },
     {
-      "name": "C1 fireflies+fog animate (pixel diff)",
+      "name": "陈巧倩 对话打开（E 键）",
       "pass": true,
-      "detail": "ratio=0.0147"
+      "detail": ""
     },
     {
-      "name": "C2 day-night drift (pixel diff)",
+      "name": "对话内容校验（陈巧倩·战场文案）",
       "pass": true,
-      "detail": "ratio=1.0000"
+      "detail": "✕陈巧倩（她正用剑鞘拨开一堆焦木，从灰烬里翻出半块没烧着的干粮，头也不抬）别愣着。战场上有闲工夫"
     },
     {
-      "name": "no page errors",
+      "name": "对话可关闭",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "洞府 portal（北·上古洞府）",
+      "pass": true,
+      "detail": "gate → {\"x\":15,\"y\":27}"
+    },
+    {
+      "name": "上古洞府 进场横幅",
+      "pass": true,
+      "detail": "上古洞府"
+    },
+    {
+      "name": "全程无页面错误",
       "pass": true,
       "detail": ""
     }
-  ],
-  "pageErrors": []
+  ]
 }

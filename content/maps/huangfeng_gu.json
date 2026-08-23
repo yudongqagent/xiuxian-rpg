@@ -33,7 +33,7 @@
     "T.................,,.................T",
     "T.........F.......,,..FF.............T",
     "T.................,,.................T",
-    "TTTTTTTTTTTTTTTTTTTDTTTTTTTTTTTTTTTTTT"
+    "TTTTTTTTTTTTTTTTTTTDTTTTTTTTTTTTTDTTTT"
   ],
   "spawn": {
     "x": 19,
@@ -59,6 +59,16 @@
         "y": 32
       },
       "label": "南·血色试炼塔"
+    },
+    {
+      "x": 33,
+      "y": 29,
+      "to": {
+        "map": "yuejiang_zhanchang",
+        "x": 12,
+        "y": 25
+      },
+      "label": "南·越疆战场"
     }
   ],
   "npcPlacements": [
