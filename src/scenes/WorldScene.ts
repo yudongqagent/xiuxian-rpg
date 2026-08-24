@@ -26,6 +26,7 @@ import {
   attachHeroDust,
   bossAura,
   buildFxTextures,
+  enemyBob,
   enemyVisualFor,
   idleBob,
   npcTextureFor,
@@ -89,6 +90,7 @@ export class WorldScene extends Phaser.Scene {
   private transitioning = false
   private battleGraceUntil = 0
   private battleAcked = false
+  private knockbackUntil = 0
   private meditating = false
   private meditateMult = 1
   private meditateTimer: Phaser.Time.TimerEvent | undefined
@@ -414,7 +416,7 @@ export class WorldScene extends Phaser.Scene {
       this.fitEnemyHitbox(wolf, vis.scale)
       wolf.setCollideWorldBounds(true)
       if (vis.boss) bossAura(this, wx, wy)
-      else idleBob(this, wolf, 1.2)
+      else enemyBob(this, wolf)
       wolf.setData('enemyId', enemyId)
       wolf.setData('homeX', wx)
       wolf.setData('homeY', wy)
@@ -522,18 +524,22 @@ export class WorldScene extends Phaser.Scene {
       bus.on('battle:end', ({ win, fled }) => {
         this.battleActive = false
         // 战斗结束后短暂免遭遇窗口，防止贴身妖兽瞬间再开战
-        this.battleGraceUntil = this.time.now + 1400
+        this.battleGraceUntil = this.time.now + 2200
         if (win) {
           this.activeEnemy?.destroy()
         } else {
           const enemy = this.activeEnemy
+          if (fled) this.knockbackUntil = this.time.now + 450
           if (fled && enemy && enemy.body) {
-            // 逃跑：双方弹开，避免仍处重叠区立刻重入战斗
+            // 逃跑：真实位移弹开（update 抑制输入 450ms，防止速度被输入覆盖）
             const dir = new Phaser.Math.Vector2(this.player.x - enemy.x, this.player.y - enemy.y)
             if (dir.lengthSq() < 0.01) dir.set(Phaser.Math.Between(-1, 1), Phaser.Math.Between(-1, 1))
-            dir.normalize().scale(140)
-            this.player.setVelocity(dir.x, dir.y)
-            ;(enemy.body as Phaser.Physics.Arcade.Body).setVelocity(-dir.x * 0.35, -dir.y * 0.35)
+            dir.normalize()
+            this.player.setPosition(
+              Phaser.Math.Clamp(this.player.x + dir.x * TILE * 1.6, 16, this.gameMap.width * TILE - 16),
+              Phaser.Math.Clamp(this.player.y + dir.y * TILE * 1.6, 16, this.gameMap.height * TILE - 16),
+            )
+            ;(enemy.body as Phaser.Physics.Arcade.Body).setVelocity(-dir.x * 60, -dir.y * 60)
           }
           if (!fled) {
             // 战败（非逃跑）：宽惩罚——气血折半，送回出生点
@@ -567,6 +573,7 @@ export class WorldScene extends Phaser.Scene {
     } else {
       this.prompt.setVisible(false)
     }
+    if (this.time.now < this.knockbackUntil) return
     const k = this.keyState()
     const vx = (this.joyVec.x + k.x) * PLAYER_SPEED
     const vy = (this.joyVec.y + k.y) * PLAYER_SPEED

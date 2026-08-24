@@ -310,12 +310,26 @@ export function attachHeroDust(
   }
 }
 
-/** NPC 待机呼吸浮动；返回句柄便于测试 */
+/** NPC 待机呼吸浮动（静态体，y 补间安全） */
 export function idleBob(scene: Phaser.Scene, target: Phaser.GameObjects.Image, amp = 2): void {
   scene.tweens.add({
     targets: target,
     y: target.y - amp,
     duration: 640,
+    delay: Phaser.Math.Between(0, 500),
+    yoyo: true,
+    repeat: -1,
+    ease: 'Sine.easeInOut',
+  })
+}
+
+/** 妖兽呼吸：缩放脉冲（动态体禁用 y 补间，否则追击速度每帧被补间覆盖） */
+export function enemyBob(scene: Phaser.Scene, target: Phaser.GameObjects.Image): void {
+  scene.tweens.add({
+    targets: target,
+    scaleX: target.scaleX * 1.06,
+    scaleY: target.scaleY * 0.94,
+    duration: 560,
     delay: Phaser.Math.Between(0, 500),
     yoyo: true,
     repeat: -1,

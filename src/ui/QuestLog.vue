@@ -8,6 +8,7 @@ import {
   type ActiveQuestView,
 } from '../systems/questRuntime'
 import type { Quest } from '../systems/schemas'
+import { resolveName } from '../systems/contentNames'
 
 const emit = defineEmits<{ close: [] }>()
 
@@ -84,7 +85,7 @@ function rewardLine(q: Quest): string {
           <span>{{ q.name }}</span>
           <small :class="'type-' + q.type">{{ TYPE_LABEL[q.type] }}</small>
         </div>
-        <p class="meta">{{ rewardLine(q) }} · 前往 {{ q.giver }} 处接取</p>
+        <p class="meta">{{ rewardLine(q) }} · 前往 {{ resolveName('npc', q.giver) }} 处接取</p>
       </li>
       <p v-if="availableList().length === 0" class="empty">暂无可接取的任务</p>
     </ul>

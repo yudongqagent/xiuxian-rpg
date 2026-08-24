@@ -32,6 +32,11 @@ function openPanel(which: 'inv' | 'quests' | 'saves'): void {
 }
 function onAppKey(e: KeyboardEvent): void {
   if (e.key !== 'Escape') return
+  if (shopNpcId.value) {
+    shopNpcId.value = null
+    e.preventDefault()
+    return
+  }
   if (showInv.value || showQuests.value || showSaves.value) {
     showInv.value = showQuests.value = showSaves.value = false
     e.preventDefault()

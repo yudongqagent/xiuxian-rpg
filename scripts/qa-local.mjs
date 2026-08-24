@@ -236,13 +236,33 @@ try {
   add('地图传送切换', teleported && !!coordsAfter,
     `${posBeforePortal?.x},${posBeforePortal?.y} → ${coordsAfter?.x},${coordsAfter?.y}`)
 
-  // 9. 存档恢复（等自动存档后刷新，位置应保持）
-  await page.waitForTimeout(6000)
-  const savedPos = await pos()
+  // 9. 存档恢复（等自动存档后刷新；若遭遇战斗导致存档跳过则重试一次）
+  async function waitStableAndSaved() {
+    // 等待战斗结束（若有）
+    for (let i = 0; i < 40; i++) {
+      if (!(await page.locator('.overlay').isVisible().catch(() => false))) break
+      await page.waitForTimeout(500)
+    }
+    const p1 = await pos()
+    await page.waitForTimeout(6000) // 覆盖 5s 自动存档周期
+    const p2 = await pos()
+    return { saved: p2, stable: !!p1 && !!p2 && Math.hypot(p1.x - p2.x, p1.y - p2.y) < 1 }
+  }
+  let result = await waitStableAndSaved()
+  let savedPos = result.saved
   await page.reload({ waitUntil: 'networkidle' })
   await dismissSplash() // 懒启动：重载后需再次点击开始，游戏才会引导擎
   await page.waitForTimeout(9000)
-  const restoredPos = await pos()
+  let restoredPos = await pos()
+  if (!result.stable || (savedPos && restoredPos && Math.hypot(savedPos.x - restoredPos.x, savedPos.y - restoredPos.y) > 4)) {
+    // 可能被战斗打断存档——再等一个周期并重载重试
+    result = await waitStableAndSaved()
+    savedPos = result.saved
+    await page.reload({ waitUntil: 'networkidle' })
+    await dismissSplash()
+    await page.waitForTimeout(9000)
+    restoredPos = await pos()
+  }
   add('自动存档 & 重载恢复',
     !!savedPos && !!restoredPos && Math.hypot(savedPos.x - restoredPos.x, savedPos.y - restoredPos.y) <= 4,
     `${savedPos?.x},${savedPos?.y} → ${restoredPos?.x},${restoredPos?.y}`)

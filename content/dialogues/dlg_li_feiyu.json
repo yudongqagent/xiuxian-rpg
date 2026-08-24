@@ -1,0 +1,12 @@
+{
+  "id": "dlg_li_feiyu",
+  "npcId": "li_feiyu",
+  "entry": "greet",
+  "nodes": [
+    {
+      "id": "greet",
+      "speaker": "李飞宇",
+      "text": "师弟！彩霞山道上狼患成灾，已有不少同门被咬伤。你若愿意出手，替我清一清那些畜生。"
+    }
+  ]
+}

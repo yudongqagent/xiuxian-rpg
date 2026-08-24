@@ -1,13 +1,30 @@
 {
   "id": "qs_tainan_xiaohui",
   "name": "太南小会风云",
-  "type": "hidden",
+  "type": "side",
   "giver": "wan_xiaoshan",
-  "prerequisites": { "realm": "炼气5层" },
+  "prerequisites": {
+    "realm": "炼气5层"
+  },
   "steps": [
-    { "kind": "reach", "region": "tainan_shan" },
-    { "kind": "talk", "npc": "qing_wen" },
-    { "kind": "talk", "npc": "chen_qiaoqian" }
+    {
+      "kind": "reach",
+      "region": "tainan_shan"
+    },
+    {
+      "kind": "talk",
+      "npc": "qing_wen"
+    },
+    {
+      "kind": "talk",
+      "npc": "chen_qiaoqian"
+    }
   ],
-  "rewards": { "lingshi": 300, "items": ["ju_qi_san"], "exp_qi": 800 }
+  "rewards": {
+    "lingshi": 300,
+    "items": [
+      "ju_qi_san"
+    ],
+    "exp_qi": 800
+  }
 }
