@@ -40,6 +40,10 @@ type GameEvents = {
   /** ENG-5：手动存/读档（slot 为 s1/s2/s3） */
   'save:write': { slot: string }
   'save:load': { slot: string }
+  /** 打坐吐纳：UI 请求切换；世界层回报状态与每跳恢复量（mult=区域灵气密度） */
+  'meditate:toggle': void
+  'meditate:state': { active: boolean; mult: number }
+  'meditate:tick': { hp: number; qi: number; mult: number }
 }
 
 /** Vue UI 与 Phaser 世界之间唯一通信通道 */

@@ -3,5 +3,8 @@
   "name": "血色试炼塔",
   "description": "七大派共辖的上古禁地，塔中血雾终年不散。每逢开塔之期，各派炼气弟子奉命入内争夺灵药机缘，禁地之内同门相残无人过问——筑基丹的主药，便生在这血色深处。",
   "levelBand": "炼气圆满（组队）",
-  "adjacent": ["taiyue_shanmai"]
+  "adjacent": [
+    "taiyue_shanmai"
+  ],
+  "qiDensity": 2.0
 }

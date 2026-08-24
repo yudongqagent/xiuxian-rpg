@@ -26,10 +26,19 @@ const ITEM_NAMES = collectNames(
   import.meta.glob('../../content/items/*.json', { eager: true }) as Record<string, unknown>,
   (d) => ItemSchema.parse(d),
 )
-const REGION_NAMES = collectNames(
-  import.meta.glob('../../content/world/*.json', { eager: true }) as Record<string, unknown>,
-  (d) => RegionSchema.parse(d),
-)
+const REGION_MODULES = import.meta.glob('../../content/world/*.json', {
+  eager: true,
+}) as Record<string, unknown>
+const REGION_NAMES = collectNames(REGION_MODULES, (d) => RegionSchema.parse(d))
+const REGION_QI = new Map<string, number>()
+for (const data of Object.values(REGION_MODULES)) {
+  const r = RegionSchema.parse(data)
+  REGION_QI.set(r.id, r.qiDensity)
+}
+
+export function regionQiDensity(regionId: string | undefined): number {
+  return (regionId && REGION_QI.get(regionId)) || 1
+}
 
 const NAMES: Record<NameKind, Map<string, string>> = {
   npc: NPC_NAMES,

@@ -3,5 +3,9 @@
   "name": "太南山",
   "description": "太岳山脉余脉中的一座灵山，每逢甲子年前后便有散修在此举办太南小会，以物易物、交流见闻。山上古庙破败，香火早绝，倒成了各路修士落脚的客栈。",
   "levelBand": "炼气~筑基",
-  "adjacent": ["luoyun_fangshi", "yuanwu_guo"]
+  "adjacent": [
+    "luoyun_fangshi",
+    "yuanwu_guo"
+  ],
+  "qiDensity": 2.0
 }

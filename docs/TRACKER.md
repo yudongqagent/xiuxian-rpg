@@ -192,3 +192,7 @@
 | 2026-08-22 | release-m1 集成四分支：world-maps→combat-depth→quest-engine→rich-graphics；修 5 处冲突 + 3 处集成缺陷（validate 地图块丢失、WorldScene 括号、area:enter 可选 regionId）；qa-local.mjs 入库并 12/12 通过 | 待发布 |
 
 | 2026-08-23 | fix-mobile-ui：修战斗重开死亡螺旋——WorldScene 的 battle:start 订阅在 BattlePanel 应答后重置 battleAcked，1.5s 看门狗误解锁致贴身妖兽重触发 battle:start（转场闪屏+白吃先手）；改为 overlap 触发处先置位再 emit，看门狗随 emit 武装。攻击/丹药/逃跑补 busy 锁（480ms，连点只算一回合），敌方反击飘字/受击延迟 300ms 分拍（回合感）。战斗面板 max-height 防矮屏裁切；HUD 补左右 safe-area。妖谷雾影蟒（攻25/血180，太岳山脉级）错置于新手练级区 → 换山魈；清 shanji.json 残留字段 enemySpowns。移动端视口（393/375/360/844×390）实测 HUD/战斗面板无出界；G1–G4 全绿（qa-local 13/13，键盘移动一项为 SwiftShader 既有竞态，复跑通过） | 已发布（release-mobile-ui 并入 feat-shop~feat-pwa 八提交，冲突 2 处地图 JSON） |
+
+| 2026-08-23 | fix-encounter-touch：修侧向撞怪不触发战斗——setScale 不缩放物理体，命中盒保持原始尺寸锚定贴图左上（右/下侧接触落空）；按缩放后视觉尺寸重建 80% 居中命中盒，并移除 player↔wolves collider 使 overlap 成唯一触发源。实测正东/正西穿怪区 1/1 触发 | 待发布 |
+
+| 2026-08-23 | feat-meditate：打坐吐纳落地——RegionSchema 增 qiDensity(0.5~3，7 区域入值：村1.0/山1.5/太南·试炼塔2.0/黄枫谷2.5/洞府3.0)、meditateTick 纯函数（每 2s 回灵3/血1 ×密度，只回血灵不产修为，锚 GDD §8 挂机≪任务）、MeditateButton FAB（右下拇指位/呼吸光晕/飘字/程序化音效）、移动·战斗·对话即打断；qa-local +1 场景 14/14 | 待发布 |

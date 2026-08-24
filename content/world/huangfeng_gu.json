@@ -3,5 +3,11 @@
   "name": "黄枫谷",
   "description": "越国正道七大派之一，谷中枫树经秋如火，灵气氤氲不散。谷内设百药园、藏经阁、器阁与任务殿，记名弟子多以杂役换取功法丹药，一步一个脚印地往仙途上爬。",
   "levelBand": "炼气~结丹",
-  "adjacent": ["caixia_shanmai", "taiyue_shanmai", "yuejiang_zhanchang", "yuanwu_guo"]
+  "adjacent": [
+    "caixia_shanmai",
+    "taiyue_shanmai",
+    "yuejiang_zhanchang",
+    "yuanwu_guo"
+  ],
+  "qiDensity": 2.5
 }

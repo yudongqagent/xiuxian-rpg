@@ -186,6 +186,30 @@ try {
     await page.waitForTimeout(300)
   }
 
+  // 7.5 打坐吐纳：点击 FAB 进入打坐态并保持；移动即打断（满血灵时无回升属预期，回升由战斗后场景覆盖）
+  {
+    const readQi = async () => {
+      const t = await page.locator('.hud .hint').textContent().catch(() => '')
+      const m = /灵 (\d+)\/(\d+)/.exec(t ?? '')
+      return m ? `${m[1]}/${m[2]}` : '?'
+    }
+    const fab = page.locator('.meditate-wrap .fab')
+    const fabVisible = await fab.isVisible().catch(() => false)
+    const qi0 = fabVisible ? await readQi() : '?'
+    if (fabVisible) await fab.click()
+    await page.waitForTimeout(800)
+    const activeOn = await fab.evaluate((el) => el.classList.contains('on')).catch(() => false)
+    await page.waitForTimeout(4200)
+    const stillOn = await fab.evaluate((el) => el.classList.contains('on')).catch(() => false)
+    await page.keyboard.down('a')
+    await page.waitForTimeout(300)
+    await page.keyboard.up('a')
+    await page.waitForTimeout(400)
+    const activeOff = await fab.evaluate((el) => el.classList.contains('on')).catch(() => true)
+    add('打坐吐纳（进入打坐态+移动打断）', fabVisible && activeOn && stillOn && !activeOff,
+      `灵 ${qi0} → ${await readQi()} · 打坐=${activeOn} · 保持=${stillOn} · 移动后=${activeOff}`)
+  }
+
   // 8. 地图传送（村南 portal (18,27) → 山道）：踏入即触发，检测坐标跃迁与新区域横幅
   const posBeforePortal = await pos()
   let teleported = false

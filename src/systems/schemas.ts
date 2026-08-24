@@ -88,6 +88,8 @@ export const RegionSchema = z.object({
   levelBand: z.string().min(1).max(20),
   /** 相邻区域 id 列表（双向对称） */
   adjacent: z.array(z.string()).default([]),
+  /** 灵气浓度（打坐恢复倍率）：凡人聚居 1.0，灵山 2.0，洞府灵脉最高 3.0 */
+  qiDensity: z.number().min(0.5).max(3).default(1),
 })
 
 export const DialogueChoiceSchema = z.object({

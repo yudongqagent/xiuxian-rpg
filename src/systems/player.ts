@@ -185,6 +185,18 @@ export function syncAfterBattle(p: PlayerState, hp: number, qi: number): PlayerS
   return { ...p, hp: clampInt(hp, 0, s.maxHp), qi: clampInt(qi, 0, s.maxQi) }
 }
 
+export const MEDITATE_QI_PER_TICK = 3
+export const MEDITATE_HP_PER_TICK = 1
+
+/** 打坐吐纳（GDD 附录 A：吐纳=恢复灵气的挂机动作）。按区域灵气密度放大，只回血灵不产修为（GDD §8：挂机 ≪ 任务） */
+export function meditateTick(p: PlayerState, qiDensity: number): { player: PlayerState; hp: number; qi: number } {
+  const s = statsForLevel(p.level)
+  const qi = Math.min(s.maxQi - p.qi, Math.round(MEDITATE_QI_PER_TICK * qiDensity))
+  const hp = Math.min(s.maxHp - p.hp, Math.round(MEDITATE_HP_PER_TICK * qiDensity))
+  if (qi <= 0 && hp <= 0) return { player: p, hp: 0, qi: 0 }
+  return { player: { ...p, hp: p.hp + hp, qi: p.qi + qi }, hp, qi }
+}
+
 function clampInt(v: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(v)))
 }

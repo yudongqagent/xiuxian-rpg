@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import Hud from './ui/Hud.vue'
 import Joystick from './ui/Joystick.vue'
+import MeditateButton from './ui/MeditateButton.vue'
 import InventoryPanel from './ui/InventoryPanel.vue'
 import DialogueBox from './ui/DialogueBox.vue'
 import BattlePanel from './ui/BattlePanel.vue'
@@ -70,6 +71,7 @@ onUnmounted(() => {
     <div ref="gameHost" class="game-host" />
     <Hud @open-inventory="openPanel('inv')" @open-quests="openPanel('quests')" @open-saves="openPanel('saves')" />
     <Joystick />
+    <MeditateButton />
     <InventoryPanel v-if="showInv" @close="showInv = false" />
     <QuestLog v-if="showQuests" @close="showQuests = false" />
     <SavePanel v-if="showSaves" @close="showSaves = false" />
