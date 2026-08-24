@@ -247,6 +247,10 @@ export function snapshotQuests(): QuestSaveData {
 
 export function restoreQuests(data: QuestSaveData | undefined): void {
   state = fromSaveData(data, QUEST_IDS)
+  // 恢复后广播，HUD 追踪条/任务日志才能立即呈现存档中的进度
+  for (const questId of Object.keys(state.active)) {
+    bus.emit('quest:updated', { questId, status: getStatus(questId) })
+  }
 }
 
 export function initQuestRuntime(): () => void {

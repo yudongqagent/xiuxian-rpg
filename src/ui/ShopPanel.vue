@@ -31,7 +31,10 @@ const sellables = computed(() =>
 )
 
 function buy(id: string, price: number): void {
+  const before = (getPlayer().inventory[id] ?? 0)
   update(buyItem, id, price)
+  // 购买同样计入任务收集进度（item:acquired 是统一入库事件）
+  if ((getPlayer().inventory[id] ?? 0) > before) bus.emit('item:acquired', { itemId: id, count: 1 })
 }
 function sell(id: string): void {
   const unit = sellPrice(id)

@@ -423,10 +423,20 @@ export class WorldScene extends Phaser.Scene {
         delay: ENEMY_WANDER_INTERVAL,
         loop: true,
         callback: () => {
-          if (this.battleActive || !wolf.body) return
+          if (this.battleActive || this.transitioning || !wolf.body) return
           const hx = wolf.getData('homeX') as number
           const hy = wolf.getData('homeY') as number
           const r = wolf.getData('radius') as number
+          // 仇恨：玩家进入 2.5 倍游荡半径则主动追击（提升遭遇率）
+          const aggro = Phaser.Math.Distance.Between(wolf.x, wolf.y, this.player.x, this.player.y)
+          if (aggro < r * 2.5 && aggro > 24) {
+            const dir = new Phaser.Math.Vector2(
+              this.player.x - wolf.x,
+              this.player.y - wolf.y,
+            ).normalize()
+            wolf.setVelocity(dir.x * ENEMY_SPEED * 1.6, dir.y * ENEMY_SPEED * 1.6)
+            return
+          }
           if (Phaser.Math.Distance.Between(wolf.x, wolf.y, hx, hy) > r) {
             const dir = new Phaser.Math.Vector2(hx - wolf.x, hy - wolf.y).normalize()
             wolf.setVelocity(dir.x * ENEMY_SPEED, dir.y * ENEMY_SPEED)

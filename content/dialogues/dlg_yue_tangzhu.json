@@ -1,0 +1,12 @@
+{
+  "id": "dlg_yue_tangzhu",
+  "npcId": "yue_tangzhu",
+  "entry": "greet",
+  "nodes": [
+    {
+      "id": "greet",
+      "speaker": "岳堂主",
+      "text": "你就是墨大夫新收的弟子？嗯，根骨尚可。百药园事务繁杂，先去月堂主处报个名吧。"
+    }
+  ]
+}
