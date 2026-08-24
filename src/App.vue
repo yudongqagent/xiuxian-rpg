@@ -3,6 +3,8 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import Hud from './ui/Hud.vue'
 import Joystick from './ui/Joystick.vue'
 import MeditateButton from './ui/MeditateButton.vue'
+import Minimap from './ui/Minimap.vue'
+import WorldMapPanel from './ui/WorldMapPanel.vue'
 import InventoryPanel from './ui/InventoryPanel.vue'
 import DialogueBox from './ui/DialogueBox.vue'
 import BattlePanel from './ui/BattlePanel.vue'
@@ -20,19 +22,21 @@ const gameHost = ref<HTMLElement | null>(null)
 const showInv = ref(false)
 const showQuests = ref(false)
 const showSaves = ref(false)
+const showMap = ref(false)
 const shopNpcId = ref<string | null>(null)
 let unShop: (() => void) | undefined
 
 /** 底部面板互斥：打开一个时关闭其余 */
-function openPanel(which: 'inv' | 'quests' | 'saves'): void {
+function openPanel(which: 'inv' | 'quests' | 'saves' | 'map'): void {
   showInv.value = which === 'inv'
   showQuests.value = which === 'quests'
   showSaves.value = which === 'saves'
+  showMap.value = which === 'map'
 }
 function onAppKey(e: KeyboardEvent): void {
   if (e.key !== 'Escape') return
-  if (showInv.value || showQuests.value || showSaves.value) {
-    showInv.value = showQuests.value = showSaves.value = false
+  if (showInv.value || showQuests.value || showSaves.value || showMap.value) {
+    showInv.value = showQuests.value = showSaves.value = showMap.value = false
     e.preventDefault()
   }
 }
@@ -69,12 +73,19 @@ onUnmounted(() => {
 <template>
   <div class="stage">
     <div ref="gameHost" class="game-host" />
-    <Hud @open-inventory="openPanel('inv')" @open-quests="openPanel('quests')" @open-saves="openPanel('saves')" />
+    <Hud
+      @open-inventory="openPanel('inv')"
+      @open-quests="openPanel('quests')"
+      @open-saves="openPanel('saves')"
+      @open-map="openPanel('map')"
+    />
     <Joystick />
     <MeditateButton />
+    <Minimap />
     <InventoryPanel v-if="showInv" @close="showInv = false" />
     <QuestLog v-if="showQuests" @close="showQuests = false" />
     <SavePanel v-if="showSaves" @close="showSaves = false" />
+    <WorldMapPanel v-if="showMap" @close="showMap = false" />
     <ShopPanel v-if="shopNpcId" :npc-id="shopNpcId" @close="shopNpcId = null" />
     <DialogueBox />
     <BattlePanel />

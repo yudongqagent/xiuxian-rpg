@@ -196,3 +196,5 @@
 | 2026-08-23 | fix-encounter-touch：修侧向撞怪不触发战斗——setScale 不缩放物理体，命中盒保持原始尺寸锚定贴图左上（右/下侧接触落空）；按缩放后视觉尺寸重建 80% 居中命中盒，并移除 player↔wolves collider 使 overlap 成唯一触发源。实测正东/正西穿怪区 1/1 触发 | 待发布 |
 
 | 2026-08-23 | feat-meditate：打坐吐纳落地——RegionSchema 增 qiDensity(0.5~3，7 区域入值：村1.0/山1.5/太南·试炼塔2.0/黄枫谷2.5/洞府3.0)、meditateTick 纯函数（每 2s 回灵3/血1 ×密度，只回血灵不产修为，锚 GDD §8 挂机≪任务）、MeditateButton FAB（右下拇指位/呼吸光晕/飘字/程序化音效）、移动·战斗·对话即打断；qa-local +1 场景 14/14 | 待发布 |
+
+| 2026-08-24 | feat-qol：QoL 大版本——①主线断链修复：setPlayerRealm 从未被调用致 qm_02（炼气3层）永不解锁；接入 player:stats 同步境界 + 中文层数解析（炼气三层=103）+ HUD「下一步：找X」引导；②章节锁：portal DSL 增 lockQuest/lockHint，黄枫谷/试炼塔/战场/洞府按主线逐章开放，踏入拦截+toast，山河图面板显示未开放；③自动寻路：BFS 网格寻路 + 点击地面移动 + 追踪条点击直达目标（talk/kill/collect/reach 定位），修路径点 ±2px 到达窗口在低帧率下震荡卡死的缺陷（10px 半径）；④自动战斗：低血用丹→伤害法术→普攻，会话内开关；⑤大地图/小地图：Minimap 角标画布 + 山河图区域面板；⑥NPC 头顶名牌；⑦妖兽 30s 原地复活（刷怪可重复）；⑧七图补道具/妖兽细节。qa-local 14→17 项 17/17，check:quest 42 项 | 待发布 |

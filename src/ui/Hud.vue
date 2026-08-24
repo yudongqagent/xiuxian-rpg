@@ -9,16 +9,20 @@ import {
   subscribePlayer,
 } from '../systems/player'
 import { ITEMS } from '../systems/itemBook'
-import { getTrackedQuest, type TrackedQuestView } from '../systems/questRuntime'
+import { getTrackedQuest, getNextMainQuestHint, type TrackedQuestView } from '../systems/questRuntime'
 
-defineEmits<{ 'open-inventory': []; 'open-quests': []; 'open-saves': [] }>()
+defineEmits<{ 'open-inventory': []; 'open-quests': []; 'open-saves': []; 'open-map': [] }>()
 
 const pos = ref({ x: 0, y: 0 })
 const player = ref(getPlayer())
 const unPos = bus.on('player:position', (p) => (pos.value = p))
 const unStats = subscribePlayer(() => (player.value = getPlayer()))
 const tracked = ref<TrackedQuestView | null>(getTrackedQuest())
-const unQuest = bus.on('quest:updated', () => (tracked.value = getTrackedQuest()))
+const nextHint = ref(getNextMainQuestHint())
+const unQuest = bus.on('quest:updated', () => {
+  tracked.value = getTrackedQuest()
+  nextHint.value = getNextMainQuestHint()
+})
 onUnmounted(() => {
   unPos()
   unStats()
@@ -42,15 +46,20 @@ function pctOf(v: number, max: number): string {
       <span class="hint">血 {{ player.hp }}/{{ stats.maxHp }} · 灵 {{ player.qi }}/{{ stats.maxQi }} · 攻 {{ stats.atk }} 防 {{ stats.def }} · 灵石 {{ player.lingshi }} · 修为
         {{ player.exp }}/{{ expToNext(player.level) }}</span>
     </div>
+    <button class="btn" @click="$emit('open-map')">地图</button>
     <button class="btn" @click="$emit('open-saves')">存档</button>
     <button class="btn" @click="$emit('open-quests')">任务</button>
     <button class="btn" @click="$emit('open-inventory')">背包</button>
     <div class="coords">{{ Math.floor(pos.x / 32) }},{{ Math.floor(pos.y / 32) }}</div>
   </div>
-  <button v-if="tracked" class="tracker" @click="$emit('open-quests')">
+  <button v-if="tracked" class="tracker" @click="bus.emit('navigate:quest')">
     <span class="tname">「{{ tracked.quest.name }}」</span>
     <span v-if="tracked.readyToTurnIn" class="tdone">目标完成，回去交付吧</span>
     <span v-else>{{ tracked.objectiveLine }}</span>
+  </button>
+  <button v-else-if="nextHint" class="tracker" @click="$emit('open-quests')">
+    <span class="tname">下一步：找{{ nextHint.giverName }}</span>
+    <span>接取「{{ nextHint.questName }}」</span>
   </button>
 </template>
 

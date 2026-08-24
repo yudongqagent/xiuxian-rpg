@@ -20,6 +20,7 @@ import {
 } from './quests'
 import { QUEST_IDS, allQuests, getQuest, questsByGiver } from './questContent'
 import { grantRewards } from './rewards'
+import { getPlayer, realmLabel } from './player'
 import type { NameKind } from './contentNames'
 
 const DEFAULT_PLAYER_REALM = '炼气1层'
@@ -241,6 +242,46 @@ export function getPlayerRealm(): string {
   return playerRealm
 }
 
+export function isQuestCompleted(questId: string): boolean {
+  return state.completed.includes(questId)
+}
+
+export interface TrackedTarget {
+  kind: 'talk' | 'kill' | 'collect' | 'reach'
+  id: string
+}
+
+/** 当前追踪目标的机器可读定位（自动寻路用） */
+export function getTrackedTarget(): TrackedTarget | null {
+  const trackedId = resolveTracked(state)
+  const quest = trackedId ? getQuest(trackedId) : null
+  if (!trackedId || !quest || !state.active[trackedId]) return null
+  if (isReadyToTurnInById(quest.id)) return { kind: 'talk', id: quest.giver }
+  const idx = currentStepIndex(quest, state.active[trackedId])
+  if (idx < 0) return null
+  const step = quest.steps[idx]
+  switch (step.kind) {
+    case 'talk':
+      return { kind: 'talk', id: step.npc }
+    case 'kill':
+      return { kind: 'kill', id: step.target }
+    case 'collect':
+      return { kind: 'collect', id: step.target }
+    case 'reach':
+      return { kind: 'reach', id: step.region }
+  }
+}
+
+/** 主线断链引导：当前无进行中任务时，指向第一个可接取的任务与其发布人 */
+export function getNextMainQuestHint(): { questId: string; questName: string; giverName: string } | null {
+  const completedSet = new Set(state.completed)
+  const next = allQuests()
+    .filter((q) => q.type === 'main' && canAccept(state, q.id) && meetsPrerequisites(q, completedSet, playerRealm))
+    .sort((a, b) => a.id.localeCompare(b.id))[0]
+  if (!next) return null
+  return { questId: next.id, questName: next.name, giverName: resolveName('npc', next.giver) }
+}
+
 export function snapshotQuests(): QuestSaveData {
   return toSaveData(state)
 }
@@ -251,7 +292,9 @@ export function restoreQuests(data: QuestSaveData | undefined): void {
 
 export function initQuestRuntime(): () => void {
   if (disposer) return disposer
+  setPlayerRealm(realmLabel(getPlayer().level))
   const unsubs = [
+    bus.on('player:stats', () => setPlayerRealm(realmLabel(getPlayer().level))),
     bus.on('dialogue:open', ({ npcId }) => dispatchTrigger({ kind: 'talk', npcId })),
     bus.on('battle:end', ({ win, enemyId }) => {
       if (win && enemyId) dispatchTrigger({ kind: 'kill', enemyId })

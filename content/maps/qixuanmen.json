@@ -107,6 +107,31 @@
       "type": "stall",
       "x": 21,
       "y": 12
+    },
+    {
+      "type": "fence",
+      "x": 8,
+      "y": 11
+    },
+    {
+      "type": "fence",
+      "x": 9,
+      "y": 11
+    },
+    {
+      "type": "lantern",
+      "x": 24,
+      "y": 20
+    },
+    {
+      "type": "stall",
+      "x": 15,
+      "y": 20
+    },
+    {
+      "type": "signpost",
+      "x": 20,
+      "y": 8
     }
   ],
   "regionId": "qixuan_men"

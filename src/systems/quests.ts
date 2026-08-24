@@ -36,6 +36,10 @@ const STAGE_BASE: Record<string, number> = {
   化神: 500,
 }
 const SUB_OFFSET: Record<string, number> = { 初期: 1, 中期: 2, 后期: 3, 圆满: 14 }
+const CN_NUMERALS: Record<string, number> = {
+  一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9,
+  十: 10, 十一: 11, 十二: 12, 十三: 13,
+}
 
 export function parseRealmOrdinal(realm: string): number {
   if (realm === '凡人') return 0
@@ -45,6 +49,8 @@ export function parseRealmOrdinal(realm: string): number {
     if (rest === '') return base + 1
     const layers = /^(\d{1,2})层$/.exec(rest)
     if (layers) return base + Number(layers[1])
+    const cn = /^([一二三四五六七八九十]{1,3})层$/.exec(rest)
+    if (cn && cn[1] in CN_NUMERALS) return base + CN_NUMERALS[cn[1]]
     return base + (SUB_OFFSET[rest] ?? 0)
   }
   return -1

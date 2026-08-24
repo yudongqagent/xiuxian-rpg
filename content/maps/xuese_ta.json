@@ -109,6 +109,16 @@
       "type": "lantern",
       "x": 15,
       "y": 26
+    },
+    {
+      "type": "lantern",
+      "x": 8,
+      "y": 6
+    },
+    {
+      "type": "lantern",
+      "x": 26,
+      "y": 19
     }
   ],
   "regionId": "xuese_shilian_ta"

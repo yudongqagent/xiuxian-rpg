@@ -244,6 +244,9 @@ export const MapPortalSchema = z.object({
     y: z.number().int().min(0),
   }),
   label: z.string().min(1).max(12),
+  /** 章节锁：需已完成的主线任务 id，未完成则禁止穿越并提示 */
+  lockQuest: z.string().regex(/^[a-z0-9_]+$/).optional(),
+  lockHint: z.string().max(40).optional(),
 })
 
 export const MapNpcPlacementSchema = z.object({

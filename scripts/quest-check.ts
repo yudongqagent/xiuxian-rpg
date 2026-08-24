@@ -242,6 +242,10 @@ function expect(label: string, cond: boolean): void {
 
   const views = buildStepViews(QUESTS['qm_04_xuese_shilian'], { counts: [1, 3, 0, 0] }, (_k, id) => id)
   expect('步骤视图当前项唯一且文本含计数', views.filter((v) => v.current).length === 1 && views[1].text.includes('3/3') && views[1].done)
+
+  // 境界解析：realmLabel 产出中文数字层（炼气三层），必须与阿拉伯数字层可比（主线断链修复回归）
+  expect('中文数字层解析', parseRealmOrdinal('炼气三层') === 103 && parseRealmOrdinal('炼气十三层') === 113)
+  expect('中文层数达标判定', meetsRealm('炼气3层', '炼气三层') && !meetsRealm('炼气3层', '炼气二层'))
 }
 
 console.log(`\n${passed} 项通过，${failures} 项失败`)

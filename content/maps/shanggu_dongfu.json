@@ -107,6 +107,16 @@
       "type": "lantern",
       "x": 23,
       "y": 21
+    },
+    {
+      "type": "lantern",
+      "x": 8,
+      "y": 8
+    },
+    {
+      "type": "lantern",
+      "x": 26,
+      "y": 19
     }
   ],
   "regionId": "shanggu_dongfu"
