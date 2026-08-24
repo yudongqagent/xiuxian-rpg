@@ -236,6 +236,108 @@ try {
   add('地图传送切换', teleported && !!coordsAfter,
     `${posBeforePortal?.x},${posBeforePortal?.y} → ${coordsAfter?.x},${coordsAfter?.y}`)
 
+  // 遇怪收尾：自动战斗打完并关闭面板（逃跑会贴身重入，故用胜利结算）
+  const closeBattle = async () => {
+    for (let i = 0; i < 3 && (await page.locator('.overlay .panel').isVisible().catch(() => false)); i++) {
+      const autoBtn = page.locator('.actions button', { hasText: '自动' }).first()
+      if (await autoBtn.isVisible().catch(() => false)) {
+        const on = await autoBtn.evaluate((el) => el.classList.contains('on')).catch(() => false)
+        if (!on) await autoBtn.click()
+        await page
+          .locator('.verdict .title', { hasText: /胜|败/ })
+          .waitFor({ state: 'visible', timeout: 60000 })
+          .catch(() => {})
+        const cont = page.locator('.verdict .ink-btn')
+        if (await cont.isVisible().catch(() => false)) {
+          await cont.click()
+          await page.waitForTimeout(900)
+        }
+      } else {
+        await page.waitForTimeout(800)
+      }
+    }
+  }
+
+  // 8.5 章节锁（世界层）：东·黄枫谷 portal(35,5) 在 qm_02 未完成时踏入被拦下并提示，不传送
+  {
+    const nav = (x, y) => page.evaluate(([tx, ty]) => window.__xiuxian?.bus.emit('navigate:tile', { x: tx, y: ty }), [x, y])
+    const dist = (p) => (p ? Math.abs(p.x - 35) + Math.abs(p.y - 5) : 99)
+    for (let i = 0; i < 20 && dist(await pos()) > 1; i++) {
+      await nav(35, 5)
+      await page.waitForTimeout(3500)
+      await closeBattle()
+    }
+    let toasts = []
+    let p = await pos()
+    await page.waitForTimeout(1800)
+    for (let i = 0; i < 10; i++) {
+      await nav(35, 5)
+      await page.waitForTimeout(500)
+      toasts = await page.locator('.quest-toast, .toast').allTextContents().catch(() => [])
+      p = await pos()
+      if (toasts.some((t) => t.includes('第二章'))) break
+      await page.waitForTimeout(1600)
+      await closeBattle()
+    }
+    const blocked = !!p && p.y < 12 && toasts.some((t) => t.includes('第二章'))
+    add('章节锁拦截', blocked, `pos=${p?.x},${p?.y} toasts=${JSON.stringify(toasts)}`)
+  }
+
+  // 8.6 自动寻路：点击屏幕下方的可走格，角色应自行走过去（遇怪打断则重点）
+  {
+    await closeBattle()
+    const before = await pos()
+    const vp = page.viewportSize() ?? { width: 1280, height: 800 }
+    let moved = false
+    let after = before
+    for (let i = 0; i < 3 && !moved; i++) {
+      await page.mouse.click(vp.width / 2 - 180, vp.height / 2 + 100)
+      await page.waitForTimeout(1800)
+      await closeBattle()
+      after = await pos()
+      moved = !!before && !!after && Math.abs(after.x - before.x) + Math.abs(after.y - before.y) >= 2
+    }
+    add('自动寻路（点击移动）', moved, `${before?.x},${before?.y} → ${after?.x},${after?.y}`)
+  }
+
+  // 8.7 自动战斗：BFS 寻路至妖兽出生点，遇怪后开自动，不手动点击直至胜负判定
+  {
+    const nav = (x, y) => page.evaluate(([tx, ty]) => window.__xiuxian?.bus.emit('navigate:tile', { x: tx, y: ty }), [x, y])
+    let opened = await page.locator('.overlay .panel').isVisible().catch(() => false)
+    for (const spot of [
+      [24, 5],
+      [13, 9],
+      [10, 6],
+    ]) {
+      for (let i = 0; i < 6 && !opened; i++) {
+        await nav(spot[0], spot[1])
+        await page.waitForTimeout(3000)
+        opened = await page.locator('.overlay .panel').isVisible().catch(() => false)
+      }
+      if (opened) break
+    }
+    if (opened) {
+      const autoBtn = page.locator('.actions button', { hasText: '自动' }).first()
+      const alreadyOn = await autoBtn.evaluate((el) => el.classList.contains('on')).catch(() => false)
+      if (!alreadyOn) await autoBtn.click()
+      const verdict = await page
+        .locator('.verdict .title', { hasText: /胜|败/ })
+        .waitFor({ state: 'visible', timeout: 60000 })
+        .then(() => true)
+        .catch(() => false)
+      add('自动战斗', verdict)
+      if (verdict) {
+        const cont = page.locator('.verdict .ink-btn')
+        if (await cont.isVisible().catch(() => false)) {
+          await cont.click()
+          await page.waitForTimeout(900)
+        }
+      }
+    } else {
+      add('自动战斗', false, '未遇怪')
+    }
+  }
+
   // 9. 存档恢复（等自动存档后刷新；若遭遇战斗导致存档跳过则重试一次）
   async function waitStableAndSaved() {
     // 等待战斗结束（若有）

@@ -1,8 +1,24 @@
 import Phaser from 'phaser'
 import { BootScene } from '../scenes/BootScene'
 import { WorldScene } from '../scenes/WorldScene'
+import { bus } from './eventBus'
+
+declare global {
+  interface Window {
+    __xiuxian?: {
+      bus: typeof bus
+      scene?: {
+        path: () => Array<[number, number]>
+        pos: () => [number, number]
+        findPath: (tx: number, ty: number) => Array<[number, number]> | null
+        portals: () => Array<{ tile: [number, number]; lockQuest?: string }>
+      }
+    }
+  }
+}
 
 export function createGame(parent: HTMLElement): Phaser.Game {
+  window.__xiuxian = { bus }
   return new Phaser.Game({
     type: Phaser.AUTO,
     parent,

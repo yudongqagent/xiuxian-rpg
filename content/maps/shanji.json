@@ -66,7 +66,9 @@
         "x": 19,
         "y": 2
       },
-      "label": "东·黄枫谷"
+      "label": "东·黄枫谷",
+      "lockQuest": "qm_02_duoshen",
+      "lockHint": "第二章·夺舍之变 完成后方可入谷"
     },
     {
       "x": 34,
@@ -86,7 +88,9 @@
         "x": 19,
         "y": 2
       },
-      "label": "东·黄枫谷"
+      "label": "东·黄枫谷",
+      "lockQuest": "qm_02_duoshen",
+      "lockHint": "第二章·夺舍之变 完成后方可入谷"
     }
   ],
   "npcPlacements": [
@@ -132,6 +136,18 @@
       "x": 28,
       "y": 13,
       "radius": 80
+    },
+    {
+      "enemyId": "hui_lang",
+      "x": 13,
+      "y": 9,
+      "radius": 96
+    },
+    {
+      "enemyId": "shan_xiao",
+      "x": 32,
+      "y": 22,
+      "radius": 96
     }
   ],
   "props": [
@@ -154,6 +170,26 @@
       "type": "fence",
       "x": 32,
       "y": 15
+    },
+    {
+      "type": "lantern",
+      "x": 8,
+      "y": 8
+    },
+    {
+      "type": "lantern",
+      "x": 28,
+      "y": 9
+    },
+    {
+      "type": "fence",
+      "x": 14,
+      "y": 22
+    },
+    {
+      "type": "fence",
+      "x": 15,
+      "y": 22
     }
   ],
   "regionId": "caixia_shanmai"

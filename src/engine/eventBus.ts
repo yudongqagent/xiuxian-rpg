@@ -44,6 +44,17 @@ type GameEvents = {
   'meditate:toggle': void
   'meditate:state': { active: boolean; mult: number }
   'meditate:tick': { hp: number; qi: number; mult: number }
+  /** 自动寻路：请求世界层沿 BFS 路径走向当前任务目标 */
+  'navigate:quest': void
+  /** 自动寻路：走向指定图块（点击寻路的事件通道） */
+  'navigate:tile': { x: number; y: number }
+  /** 小地图数据：进入地图时发一次全量快照（图块行 + 静态点位，图块坐标） */
+  'map:minimap': {
+    rows: string[]
+    player: { x: number; y: number }
+    npcs: Array<{ x: number; y: number }>
+    portals: Array<{ x: number; y: number; locked: boolean }>
+  }
 }
 
 /** Vue UI 与 Phaser 世界之间唯一通信通道 */

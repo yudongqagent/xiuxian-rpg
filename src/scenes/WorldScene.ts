@@ -18,7 +18,12 @@ import {
 } from '../systems/player'
 import { regionQiDensity } from '../systems/contentNames'
 // quest-engine：任务进度恢复与入档
-import { restoreQuests, snapshotQuests } from '../systems/questRuntime'
+import {
+  getTrackedTarget,
+  isQuestCompleted,
+  restoreQuests,
+  snapshotQuests,
+} from '../systems/questRuntime'
 // ==== rich-graphics ====
 import {
   addAmbientFx,
@@ -56,6 +61,15 @@ const FADE_MS = 350
 const SAVE_VERSION = 2
 const BATTLE_ACK_WATCHDOG_MS = 1500
 const MEDITATE_TICK_MS = 2000
+const LOCK_TOAST_COOLDOWN_MS = 1500
+const ENEMY_RESPAWN_MS = 30000
+const WAYPOINT_ARRIVAL_PX = 10
+const PATH_DIRS: Array<[number, number]> = [
+  [0, -1],
+  [0, 1],
+  [-1, 0],
+  [1, 0],
+]
 
 // ===================================================================
 // 多地图系统（world-maps 分支）：地图来自 content/maps/*.json DSL，
@@ -84,7 +98,14 @@ export class WorldScene extends Phaser.Scene {
   private mapId = DEFAULT_MAP_ID
   private gameMap!: GameMap
   private spawnPoint = { x: 0, y: 0 }
-  private portalZones: Array<{ zone: Phaser.GameObjects.Zone; to: PortalTarget }> = []
+  private portalZones: Array<{
+    zone: Phaser.GameObjects.Zone
+    to: PortalTarget
+    lockQuest?: string
+    lockHint?: string
+  }> = []
+  private lockToastUntil = 0
+  private autoPath: Phaser.Math.Vector2[] = []
   private obstacles!: Phaser.Physics.Arcade.StaticGroup
   private ready = false
   private transitioning = false
@@ -245,6 +266,28 @@ export class WorldScene extends Phaser.Scene {
     this.cameras.main.fadeIn(FADE_MS, 0, 0, 0)
     bus.emit('area:enter', { name: this.gameMap.name, regionId: this.gameMap.regionId })
     this.ready = true
+    const qa = (window.__xiuxian ??= { bus })
+    qa.scene = {
+      path: () => this.autoPath.map((p) => [Math.round(p.x), Math.round(p.y)]),
+      pos: () => [Math.round(this.player.x), Math.round(this.player.y)],
+      findPath: (tx: number, ty: number) =>
+        this.findPath(tx, ty)?.map((p) => [Math.round(p.x), Math.round(p.y)]) ?? null,
+      portals: () =>
+        this.portalZones.map((z) => ({
+          tile: [Math.round(z.zone.x / TILE), Math.round(z.zone.y / TILE)],
+          lockQuest: z.lockQuest,
+        })),
+    }
+    bus.emit('map:minimap', {
+      rows: this.gameMap.rows,
+      player: { x: this.player.x / TILE, y: this.player.y / TILE },
+      npcs: this.gameMap.npcPlacements.map((n) => ({ x: n.x, y: n.y })),
+      portals: this.gameMap.portals.map((p) => ({
+        x: p.x,
+        y: p.y,
+        locked: Boolean(p.lockQuest && !isQuestCompleted(p.lockQuest)),
+      })),
+    })
 
     // PT-6：窗口失焦/切页时清空输入，防止按键状态残留
     const clearInput = () => {
@@ -323,21 +366,67 @@ export class WorldScene extends Phaser.Scene {
     )
   }
 
-  /** 传送门：踏入后淡出 → restart 携带目标地图与落点 */
+  /** 传送门：踏入后淡出 → restart 携带目标地图与落点；章节锁未解锁则提示并拦下 */
   private placePortals(): void {
     this.portalZones = this.gameMap.portals.map((p) => {
       const zone = this.add.zone(p.x * TILE + TILE / 2, p.y * TILE + TILE / 2, TILE, TILE)
       this.physics.add.existing(zone, true)
       this.add
-        .text(zone.x, zone.y - TILE, p.label, {
+        .text(zone.x, zone.y - TILE, p.lockQuest ? `🔒${p.label}` : p.label, {
           fontSize: '11px',
-          color: '#bff3e8',
+          color: p.lockQuest ? '#c9b18a' : '#bff3e8',
           backgroundColor: 'rgba(26,18,11,0.7)',
           padding: { x: 4, y: 2 },
         })
         .setOrigin(0.5)
-      return { zone, to: p.to }
+      return { zone, to: p.to, lockQuest: p.lockQuest, lockHint: p.lockHint }
     })
+  }
+
+  /** 任务追踪导航：解析当前目标 → 本图内定位 → 自动寻路 */
+  private navigateToObjective(): void {
+    const target = getTrackedTarget()
+    if (!target) {
+      bus.emit('quest:notify', { text: '暂无进行中的任务', kind: 'info' })
+      return
+    }
+    if (target.kind === 'talk') {
+      const spot = this.gameMap.npcPlacements.find((n) => n.npcId === target.id)
+      if (!spot) {
+        bus.emit('quest:notify', { text: '此人不在本图，先去别处寻访', kind: 'info' })
+        return
+      }
+      this.startAutoPathTo(spot.x, spot.y + 1)
+      return
+    }
+    if (target.kind === 'reach') {
+      const portal = this.gameMap.portals.find((pt) => getGameMap(pt.to.map).regionId === target.id)
+      if (!portal) {
+        bus.emit('quest:notify', { text: '本图没有通往该处的路', kind: 'info' })
+        return
+      }
+      if (portal.lockQuest && !isQuestCompleted(portal.lockQuest)) {
+        bus.emit('quest:notify', { text: portal.lockHint ?? '此路尚未开启', kind: 'info' })
+        return
+      }
+      this.startAutoPathTo(portal.x, portal.y)
+      return
+    }
+    const spawns = this.gameMap.enemySpawns.filter(
+      (s) => target.kind === 'collect' || s.enemyId === target.id,
+    )
+    if (spawns.length === 0) {
+      bus.emit('quest:notify', { text: '目标不在本图，去别处看看', kind: 'info' })
+      return
+    }
+    const p = this.player
+    const nearest = spawns.reduce((a, b) =>
+      Phaser.Math.Distance.Between(a.x, a.y, p.x / TILE, p.y / TILE) <
+      Phaser.Math.Distance.Between(b.x, b.y, p.x / TILE, p.y / TILE)
+        ? a
+        : b,
+    )
+    this.startAutoPathTo(nearest.x, nearest.y)
   }
 
   private placeNpcs(): void {
@@ -352,6 +441,17 @@ export class WorldScene extends Phaser.Scene {
       idleBob(this, sprite, 1.6)
       sprite.setInteractive({ useHandCursor: true })
       sprite.on('pointerdown', () => this.tryInteract())
+      void import('../systems/contentNames').then((m) => {
+        this.add
+          .text(sprite.x, sprite.y - 26, m.resolveName('npc', npcId), {
+            fontSize: '11px',
+            color: '#ffe9b0',
+            stroke: '#1a120b',
+            strokeThickness: 3,
+          })
+          .setOrigin(0.5, 1)
+          .setDepth(6)
+      })
       this.npcs.push({ id: npcId, sprite })
     })
     // ==== gfx-battle-ui：NPC 待机动作池 + 对话面向玩家（GFX2-A3）====
@@ -476,12 +576,108 @@ export class WorldScene extends Phaser.Scene {
       if (this.transitioning || this.battleActive) return
       const hit = this.portalZones.find((z) => z.zone === zObj)
       if (!hit) return
+      if (hit.lockQuest && !isQuestCompleted(hit.lockQuest)) {
+        if (this.time.now > this.lockToastUntil) {
+          this.lockToastUntil = this.time.now + LOCK_TOAST_COOLDOWN_MS
+          bus.emit('quest:notify', { text: hit.lockHint ?? '此路尚未开启', kind: 'info' })
+        }
+        const last = this.autoPath[this.autoPath.length - 1]
+        if (!last || (Math.abs(last.x - hit.zone.x) < TILE && Math.abs(last.y - hit.zone.y) < TILE)) {
+          this.autoPath = []
+        }
+        return
+      }
       this.transitionTo(hit.to)
     })
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (!this.ready || this.dialogueOpen || this.battleActive || this.transitioning) return
+      const tx = Math.floor(pointer.worldX / TILE)
+      const ty = Math.floor(pointer.worldY / TILE)
+      if (tx < 0 || ty < 0 || tx >= this.gameMap.width || ty >= this.gameMap.height) return
+      const near = this.nearestNpc()
+      if (near && Phaser.Math.Distance.Between(pointer.worldX, pointer.worldY, near.sprite.x, near.sprite.y) < TILE) {
+        this.tryInteract()
+        return
+      }
+      this.startAutoPathTo(tx, ty)
+    })
+  }
+
+  /** BFS 网格寻路（4 向，图块中心为路径点）；目标不可走时吸附到 3 格内最近可走格 */
+  private startAutoPathTo(tx: number, ty: number): void {
+    if (this.meditating) this.stopMeditate()
+    if (!isWalkable(this.gameMap, tx, ty)) {
+      const near = this.nearestWalkable(tx, ty, 3)
+      if (!near) {
+        bus.emit('quest:notify', { text: '那里过不去', kind: 'info' })
+        return
+      }
+      tx = near.x
+      ty = near.y
+    }
+    const path = this.findPath(tx, ty)
+    if (!path) {
+      bus.emit('quest:notify', { text: '那里过不去', kind: 'info' })
+      return
+    }
+    this.autoPath = path
+  }
+
+  private nearestWalkable(tx: number, ty: number, radius: number): { x: number; y: number } | null {
+    for (let r = 1; r <= radius; r++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue
+          if (isWalkable(this.gameMap, tx + dx, ty + dy)) return { x: tx + dx, y: ty + dy }
+        }
+      }
+    }
+    return null
+  }
+
+  private findPath(tx: number, ty: number): Phaser.Math.Vector2[] | null {
+    const sx = Math.floor(this.player.x / TILE)
+    const sy = Math.floor(this.player.y / TILE)
+    if (sx === tx && sy === ty) return []
+    const w = this.gameMap.width
+    const h = this.gameMap.height
+    const prev = new Map<number, number>()
+    const queue: number[] = [sy * w + sx]
+    prev.set(sy * w + sx, -1)
+    let found = -1
+    while (queue.length > 0) {
+      const cur = queue.shift()!
+      const cx = cur % w
+      const cy = Math.floor(cur / w)
+      if (cx === tx && cy === ty) {
+        found = cur
+        break
+      }
+      for (const [dx, dy] of PATH_DIRS) {
+        const nx = cx + dx
+        const ny = cy + dy
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue
+        if (!isWalkable(this.gameMap, nx, ny)) continue
+        const key = ny * w + nx
+        if (prev.has(key)) continue
+        prev.set(key, cur)
+        queue.push(key)
+      }
+    }
+    if (found < 0) return null
+    const path: Phaser.Math.Vector2[] = []
+    for (let cur = found; cur >= 0; cur = prev.get(cur)!) {
+      const cx = cur % w
+      const cy = Math.floor(cur / w)
+      if (cx === sx && cy === sy) break
+      path.unshift(new Phaser.Math.Vector2(cx * TILE + TILE / 2, cy * TILE + TILE / 2))
+    }
+    return path
   }
 
   private transitionTo(to: PortalTarget): void {
     this.transitioning = true
+    this.autoPath = []
     this.player!.setVelocity(0, 0)
     this.joyVec = { x: 0, y: 0 }
     this.cameras.main.fadeOut(FADE_MS, 0, 0, 0)
@@ -521,12 +717,27 @@ export class WorldScene extends Phaser.Scene {
       bus.on('save:load', ({ slot }) => void this.loadFromSlot(slot as SlotId)),
       bus.on('battle:opened', () => (this.battleAcked = true)),
       bus.on('meditate:toggle', () => this.toggleMeditate()),
+      bus.on('navigate:quest', () => this.navigateToObjective()),
+      bus.on('navigate:tile', ({ x, y }) => this.startAutoPathTo(x, y)),
+      bus.on('joystick:move', () => (this.autoPath = [])),
       bus.on('battle:end', ({ win, fled }) => {
         this.battleActive = false
         // 战斗结束后短暂免遭遇窗口，防止贴身妖兽瞬间再开战
         this.battleGraceUntil = this.time.now + 2200
         if (win) {
-          this.activeEnemy?.destroy()
+          const enemy = this.activeEnemy
+          if (enemy && enemy.body) {
+            // 妖兽 30s 后在出生点复活（刷怪可重复，锚 GDD 碎片可玩）
+            enemy.setVisible(false)
+            ;(enemy.body as Phaser.Physics.Arcade.Body).enable = false
+            const hx = enemy.getData('homeX') as number
+            const hy = enemy.getData('homeY') as number
+            this.time.delayedCall(ENEMY_RESPAWN_MS, () => {
+              if (!enemy.body) return
+              enemy.enableBody(true, hx, hy, true, true)
+              enemy.setVelocity(0, 0)
+            })
+          }
         } else {
           const enemy = this.activeEnemy
           if (fled) this.knockbackUntil = this.time.now + 450
@@ -563,6 +774,7 @@ export class WorldScene extends Phaser.Scene {
       }
     }
     if (this.dialogueOpen || this.battleActive) {
+      this.autoPath = []
       this.player.setVelocity(0, 0)
       return
     }
@@ -575,9 +787,23 @@ export class WorldScene extends Phaser.Scene {
     }
     if (this.time.now < this.knockbackUntil) return
     const k = this.keyState()
-    const vx = (this.joyVec.x + k.x) * PLAYER_SPEED
-    const vy = (this.joyVec.y + k.y) * PLAYER_SPEED
-    this.player.setVelocity(Phaser.Math.Clamp(vx, -PLAYER_SPEED, PLAYER_SPEED), Phaser.Math.Clamp(vy, -PLAYER_SPEED, PLAYER_SPEED))
+    if (k.x !== 0 || k.y !== 0) this.autoPath = []
+    if (this.autoPath.length > 0) {
+      const target = this.autoPath[0]
+      const dx = target.x - this.player.x
+      const dy = target.y - this.player.y
+      if (Math.abs(dx) < WAYPOINT_ARRIVAL_PX && Math.abs(dy) < WAYPOINT_ARRIVAL_PX) {
+        this.autoPath.shift()
+        if (this.autoPath.length === 0) this.player.setVelocity(0, 0)
+      } else {
+        const dir = new Phaser.Math.Vector2(dx, dy).normalize()
+        this.player.setVelocity(dir.x * PLAYER_SPEED, dir.y * PLAYER_SPEED)
+      }
+    } else {
+      const vx = (this.joyVec.x + k.x) * PLAYER_SPEED
+      const vy = (this.joyVec.y + k.y) * PLAYER_SPEED
+      this.player.setVelocity(Phaser.Math.Clamp(vx, -PLAYER_SPEED, PLAYER_SPEED), Phaser.Math.Clamp(vy, -PLAYER_SPEED, PLAYER_SPEED))
+    }
 
     // ==== rich-graphics：行走动画与尘土 ====
     const moving = Math.abs(this.player.body.velocity.x) + Math.abs(this.player.body.velocity.y) > 4

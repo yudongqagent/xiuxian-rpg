@@ -58,7 +58,9 @@
         "x": 15,
         "y": 32
       },
-      "label": "南·血色试炼塔"
+      "label": "南·血色试炼塔",
+      "lockQuest": "qm_03_baiyaoyuan",
+      "lockHint": "第三章·百药园 完成后方可入塔"
     },
     {
       "x": 33,
@@ -68,7 +70,9 @@
         "x": 12,
         "y": 25
       },
-      "label": "南·越疆战场"
+      "label": "南·越疆战场",
+      "lockQuest": "qm_04_xuese_shilian",
+      "lockHint": "第四章·血色试炼 完成后方可赴边"
     }
   ],
   "npcPlacements": [
@@ -139,6 +143,26 @@
       "type": "fence",
       "x": 13,
       "y": 10
+    },
+    {
+      "type": "lantern",
+      "x": 10,
+      "y": 6
+    },
+    {
+      "type": "lantern",
+      "x": 24,
+      "y": 7
+    },
+    {
+      "type": "stall",
+      "x": 17,
+      "y": 5
+    },
+    {
+      "type": "well",
+      "x": 12,
+      "y": 12
     }
   ],
   "regionId": "huangfeng_gu"

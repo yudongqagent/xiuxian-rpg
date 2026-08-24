@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, toRaw } from 'vue'
+import { computed, onUnmounted, ref, toRaw, watch } from 'vue'
 import { bus } from '../engine/eventBus'
 import { EnemySchema, ItemSchema, SkillSchema, type Enemy, type Item, type Skill } from '../systems/schemas'
 import {
@@ -74,6 +74,8 @@ const FLASH_MS = 320
 const SHAKE_MS = 360
 const ACTION_LOCK_MS = 480
 const ENEMY_BEAT_MS = 300
+const AUTO_THINK_MS = 380
+const AUTO_HEAL_THRESHOLD = 0.35
 
 const active = ref(false)
 const state = ref<BattleState | null>(null)
@@ -285,6 +287,44 @@ function toggle(menu: 'skill' | 'item'): void {
   submenu.value = submenu.value === menu ? 'none' : menu
 }
 
+// ==== 自动战斗：低血先丹药 → 伤害法术 → 普攻；会话内记忆开关 ====
+const auto = ref(false)
+
+function toggleAuto(): void {
+  auto.value = !auto.value
+  if (auto.value) window.setTimeout(autoThink, AUTO_THINK_MS)
+}
+
+function autoThink(): void {
+  if (!auto.value) return
+  const cur = state.value
+  if (!cur || cur.over || !active.value) return
+  if (busy.value) {
+    window.setTimeout(autoThink, AUTO_THINK_MS)
+    return
+  }
+  const hpPct = cur.player.hp / cur.player.maxHp
+  if (hpPct <= AUTO_HEAL_THRESHOLD) {
+    const heal = battleItems.value.find((row) => (row.item.effect?.hp ?? 0) > 0)
+    if (heal) {
+      useBattleItem(heal.item.id)
+      return
+    }
+  }
+  const skill = learnedSkills.value.find(
+    (s) => skillEffect(s).kind === 'damage' && cur.player.qi >= skillEffect(s).cost,
+  )
+  if (skill) {
+    cast(skill.id)
+    return
+  }
+  act('attack')
+}
+
+watch(state, () => {
+  if (auto.value) window.setTimeout(autoThink, AUTO_THINK_MS)
+})
+
 function pct(v: number, max: number): string {
   return `${Math.round((v / max) * 100)}%`
 }
@@ -359,6 +399,7 @@ function pct(v: number, max: number): string {
           <button :disabled="busy || learnedSkills.length === 0" @click="toggle('skill')">法术</button>
           <button :disabled="busy || battleItems.length === 0" @click="toggle('item')">丹药</button>
           <button class="flee" :disabled="busy" @click="act('flee')">逃跑({{ Math.round(fleeChance(state) * 100) }}%)</button>
+          <button class="auto" :class="{ on: auto }" @click="toggleAuto">自动·{{ auto ? '开' : '关' }}</button>
         </div>
       </template>
       <template v-else>
@@ -762,6 +803,13 @@ function pct(v: number, max: number): string {
 }
 .flee {
   max-width: 110px;
+}
+.auto {
+  max-width: 110px;
+}
+.auto.on {
+  border-color: #ffd97a;
+  color: #ffd97a;
 }
 .empty {
   width: 100%;

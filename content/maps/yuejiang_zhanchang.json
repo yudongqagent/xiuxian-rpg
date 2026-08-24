@@ -56,7 +56,9 @@
         "x": 15,
         "y": 27
       },
-      "label": "北·上古洞府"
+      "label": "北·上古洞府",
+      "lockQuest": "qm_05_zhengmo_zhanyi",
+      "lockHint": "第五章·正魔之战 完成后方可探府"
     }
   ],
   "npcPlacements": [
@@ -141,6 +143,16 @@
       "type": "fence",
       "x": 23,
       "y": 16
+    },
+    {
+      "type": "signpost",
+      "x": 4,
+      "y": 4
+    },
+    {
+      "type": "fence",
+      "x": 20,
+      "y": 14
     }
   ],
   "regionId": "yuejiang_zhanchang"

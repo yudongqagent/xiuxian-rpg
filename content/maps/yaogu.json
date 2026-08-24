@@ -83,6 +83,18 @@
       "x": 22,
       "y": 8,
       "radius": 100
+    },
+    {
+      "enemyId": "shan_xiao",
+      "x": 28,
+      "y": 21,
+      "radius": 100
+    },
+    {
+      "enemyId": "du_zhu",
+      "x": 8,
+      "y": 22,
+      "radius": 80
     }
   ],
   "props": [
@@ -105,6 +117,11 @@
       "type": "lantern",
       "x": 14,
       "y": 12
+    },
+    {
+      "type": "signpost",
+      "x": 4,
+      "y": 14
     }
   ],
   "regionId": "tainan_shan"

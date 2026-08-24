@@ -16,6 +16,11 @@ export function getGameMap(id: string): GameMap {
   return maps.get(id) ?? maps.get(DEFAULT_MAP_ID)!
 }
 
+/** 全量地图（大地图面板用）；按内容文件名排序保证展示稳定 */
+export function getAllMaps(): GameMap[] {
+  return [...maps.values()].sort((a, b) => a.id.localeCompare(b.id))
+}
+
 export function tileAt(map: GameMap, x: number, y: number): string | null {
   return map.rows[y]?.[x] ?? null
 }
