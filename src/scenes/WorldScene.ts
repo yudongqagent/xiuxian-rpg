@@ -624,11 +624,14 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  /** 从指定档位恢复：应用成长/任务后带落点重启场景 */
+  /** 从指定档位恢复：先落盘为当前进度，再带落点重启场景 */
   private async loadFromSlot(slot: SlotId): Promise<void> {
     if (this.transitioning) return
     const data = await loadSave(slot)
     if (!data) return
+    // 关键：写入 auto 档。重启后 initWorld 从 auto 档恢复，
+    // 否则会被旧自动存档覆盖（表现为读档后等级/任务回退）
+    await writeSave(data, AUTO_SLOT)
     setPlayer(fromPlayerSave(data.player))
     restoreQuests(data.quests)
     bus.emit('player:stats')
