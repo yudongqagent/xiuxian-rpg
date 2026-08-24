@@ -1,0 +1,12 @@
+{
+  "id": "dlg_xinggong_shengzhu",
+  "npcId": "xinggong_shengzhu",
+  "entry": "greet",
+  "nodes": [
+    {
+      "id": "greet",
+      "speaker": "星宫圣主",
+      "text": "本座于此静候有缘之人。海兽内丹……你既有缘得之，便交予本座吧。"
+    }
+  ]
+}

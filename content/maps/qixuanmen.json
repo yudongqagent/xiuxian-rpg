@@ -79,6 +79,11 @@
       "npcId": "jin_guang_shangren",
       "x": 23,
       "y": 20
+    },
+    {
+      "npcId": "wanbaolou_zhanggui",
+      "x": 25,
+      "y": 20
     }
   ],
   "enemySpawns": [],

@@ -2,8 +2,22 @@
   "id": "du_zhu",
   "name": "毒蛛",
   "description": "栖息于腐叶之下的青斑毒蛛，牙缝间滴着毒涎。被它咬中，毒素会顺着血脉步步侵蚀。",
-  "stats": { "hp": 26, "atk": 5, "def": 2, "speed": 6 },
+  "stats": {
+    "hp": 26,
+    "atk": 5,
+    "def": 2,
+    "speed": 6
+  },
   "exp": 16,
   "special": "poison",
-  "loot": [{ "item": "qi_xie_ling_cao", "chance": 0.4 }]
+  "loot": [
+    {
+      "item": "qi_xie_ling_cao",
+      "chance": 0.4
+    },
+    {
+      "item": "bai_nian_ling_zhi",
+      "chance": 0.2
+    }
+  ]
 }

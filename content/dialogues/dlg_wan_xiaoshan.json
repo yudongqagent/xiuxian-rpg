@@ -1,0 +1,12 @@
+{
+  "id": "dlg_wan_xiaoshan",
+  "npcId": "wan_xiaoshan",
+  "entry": "greet",
+  "nodes": [
+    {
+      "id": "greet",
+      "speaker": "万小山",
+      "text": "万宝楼小掌柜在此收山货！灵芝妖丹，概不还价。"
+    }
+  ]
+}

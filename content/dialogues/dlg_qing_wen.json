@@ -1,0 +1,12 @@
+{
+  "id": "dlg_qing_wen",
+  "npcId": "qing_wen",
+  "entry": "greet",
+  "nodes": [
+    {
+      "id": "greet",
+      "speaker": "青纹",
+      "text": "台南山的消息我最灵通——想打听什么，先拿灵草来换。"
+    }
+  ]
+}

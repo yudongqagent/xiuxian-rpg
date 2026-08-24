@@ -1,0 +1,12 @@
+{
+  "id": "dlg_qu_hun",
+  "npcId": "qu_hun",
+  "entry": "greet",
+  "nodes": [
+    {
+      "id": "greet",
+      "speaker": "驱魂老人",
+      "text": "咳咳……老朽守在此地，只为超度那些困于妖谷的亡魂。小友身上煞气不轻啊。"
+    }
+  ]
+}

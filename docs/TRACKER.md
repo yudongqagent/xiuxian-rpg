@@ -189,6 +189,8 @@
 
 | 2026-08-22 | hotfix-playtest：对抗性回归修复——商店购买计入任务收集（item:acquired）、岳堂主真对话、restoreQuests 广播刷新追踪条、妖兽仇恨追击、山道东侧门户加宽 | 已发布 |
 
+| 2026-08-22 | feat-sidequests：16 条支线全通——5 名支线 NPC 入世+对话、百年灵芝/海兽内丹掉落来源补全 | 已发布 |
+
 > 集成约定：功能分支一律从最新 main 切出；集成在 release-* 工作树完成，冲突解决后跑满 G1–G4 再快进 main 发布。
 
 | 2026-08-22 | release-m1 集成四分支：world-maps→combat-depth→quest-engine→rich-graphics；修 5 处冲突 + 3 处集成缺陷（validate 地图块丢失、WorldScene 括号、area:enter 可选 regionId）；qa-local.mjs 入库并 12/12 通过 | 待发布 |

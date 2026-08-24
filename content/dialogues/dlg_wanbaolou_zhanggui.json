@@ -1,0 +1,12 @@
+{
+  "id": "dlg_wanbaolou_zhanggui",
+  "npcId": "wanbaolou_zhanggui",
+  "entry": "greet",
+  "nodes": [
+    {
+      "id": "greet",
+      "speaker": "万宝楼掌柜",
+      "text": "百年灵芝只此一家欲购？呵，先拿货来，再谈价钱。"
+    }
+  ]
+}

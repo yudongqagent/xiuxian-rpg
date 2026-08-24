@@ -49,10 +49,41 @@
       "label": "西·山道"
     }
   ],
-  "npcPlacements": [],
+  "npcPlacements": [
+    {
+      "npcId": "qu_hun",
+      "x": 8,
+      "y": 20
+    },
+    {
+      "npcId": "qing_wen",
+      "x": 18,
+      "y": 22
+    },
+    {
+      "npcId": "wan_xiaoshan",
+      "x": 15,
+      "y": 6
+    },
+    {
+      "npcId": "xinggong_shengzhu",
+      "x": 26,
+      "y": 6
+    }
+  ],
   "enemySpawns": [
-    { "enemyId": "shan_xiao", "x": 14, "y": 14, "radius": 100 },
-    { "enemyId": "yelang_bangzhong", "x": 22, "y": 8, "radius": 100 }
+    {
+      "enemyId": "shan_xiao",
+      "x": 14,
+      "y": 14,
+      "radius": 100
+    },
+    {
+      "enemyId": "yelang_bangzhong",
+      "x": 22,
+      "y": 8,
+      "radius": 100
+    }
   ],
   "props": [
     {
