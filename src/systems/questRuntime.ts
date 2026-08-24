@@ -20,6 +20,7 @@ import {
 } from './quests'
 import { QUEST_IDS, allQuests, getQuest, questsByGiver } from './questContent'
 import { grantRewards } from './rewards'
+import { getPlayer, realmLabel } from './player'
 import type { NameKind } from './contentNames'
 
 const DEFAULT_PLAYER_REALM = '炼气1层'
@@ -255,7 +256,10 @@ export function restoreQuests(data: QuestSaveData | undefined): void {
 
 export function initQuestRuntime(): () => void {
   if (disposer) return disposer
+  // 境界与玩家等级联动（此前从未同步，导致筑基前置永远无法满足）
+  setPlayerRealm(realmLabel(getPlayer().level))
   const unsubs = [
+    bus.on('player:stats', () => setPlayerRealm(realmLabel(getPlayer().level))),
     bus.on('dialogue:open', ({ npcId }) => dispatchTrigger({ kind: 'talk', npcId })),
     bus.on('battle:end', ({ win, enemyId }) => {
       if (win && enemyId) dispatchTrigger({ kind: 'kill', enemyId })

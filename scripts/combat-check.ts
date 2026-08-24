@@ -214,8 +214,9 @@ expect('玩家攻击锚点为10', PLAYER_BASE_STATS.atk === 10)
     realmLabel(1) === '炼气一层' &&
       realmLabel(3) === '炼气三层' &&
       realmLabel(12) === '炼气十二层' &&
-      realmLabel(13) === '炼气十三层·圆满' &&
-      realmLabel(99) === '炼气十三层·圆满',
+      realmLabel(13) === '炼气十三层' &&
+      realmLabel(14) === '筑基初期' &&
+      realmLabel(99) === '筑基圆满',
   )
   expect(
     '敌人经验取自模板或按stats推导',

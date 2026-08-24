@@ -21,6 +21,7 @@ import {
   toSaveData,
   turnInQuest,
 } from '../src/systems/quests'
+import { realmLabel } from '../src/systems/player'
 
 const QUEST_DIR = join(import.meta.dirname, '..', 'content', 'quests')
 
@@ -242,6 +243,20 @@ function expect(label: string, cond: boolean): void {
 
   const views = buildStepViews(QUESTS['qm_04_xuese_shilian'], { counts: [1, 3, 0, 0] }, (_k, id) => id)
   expect('步骤视图当前项唯一且文本含计数', views.filter((v) => v.current).length === 1 && views[1].text.includes('3/3') && views[1].done)
+}
+
+// ===== 回归：玩家境界与筑基前置（fix-realm）=====
+{
+  expect('realmLabel(13)=炼气十三层', realmLabel(13) === '炼气十三层')
+  expect('realmLabel(14)=筑基初期', realmLabel(14) === '筑基初期')
+  expect('realmLabel(20)=筑基圆满', realmLabel(20) === '筑基圆满')
+  expect('筑基初期序数 > 炼气十三层', parseRealmOrdinal('筑基初期') > parseRealmOrdinal('炼气十三层'))
+  const q5 = QUESTS['qm_05_zhengmo_zhanyi']
+  if (q5) {
+    const done4 = new Set(['qm_01_rumen', 'qm_02_duoshen', 'qm_03_baiyaoyuan', 'qm_04_xuese_shilian'])
+    expect('炼气圆满不满足 qm_05', !meetsPrerequisites(q5, done4, realmLabel(13)))
+    expect('筑基初期满足 qm_05', meetsPrerequisites(q5, done4, realmLabel(14)))
+  }
 }
 
 console.log(`\n${passed} 项通过，${failures} 项失败`)

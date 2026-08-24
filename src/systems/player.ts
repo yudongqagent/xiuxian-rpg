@@ -94,9 +94,12 @@ export function expToNext(level: number): number {
 const REALM_NUMERALS = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二', '十三']
 const REALM_MAX_LAYER = REALM_NUMERALS.length
 
+/** 境界标签：炼气 1-13 层 → 筑基初期/中期/后期/圆满（14+）。字符串需与 quests.parseRealmOrdinal 兼容。 */
 export function realmLabel(level: number): string {
-  if (level >= REALM_MAX_LAYER) return `炼气${REALM_NUMERALS[REALM_MAX_LAYER - 1]}层·圆满`
-  return `炼气${REALM_NUMERALS[level - 1]}层`
+  if (level <= REALM_MAX_LAYER) return `炼气${REALM_NUMERALS[level - 1]}层`
+  const zhu = level - REALM_MAX_LAYER
+  if (zhu <= 3) return `筑基${(['初期', '中期', '后期'] as const)[zhu - 1]}`
+  return '筑基圆满'
 }
 
 export function createPlayer(): PlayerState {
