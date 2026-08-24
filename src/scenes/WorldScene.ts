@@ -10,11 +10,13 @@ import { FRAME, HOUSE_KEY, MAP_ATLAS_KEY, buildMapTileTextures } from './mapTile
 import {
   fromPlayerSave,
   getPlayer,
+  meditateTick,
   respawnPenalty,
   setPlayer,
   toPlayerSave,
   updatePlayer,
 } from '../systems/player'
+import { regionQiDensity } from '../systems/contentNames'
 // quest-engine：任务进度恢复与入档
 import { restoreQuests, snapshotQuests } from '../systems/questRuntime'
 // ==== rich-graphics ====
@@ -46,10 +48,13 @@ const TILE = 32
 const PLAYER_SPEED = 160
 const ENEMY_SPEED = 40
 const ENEMY_WANDER_INTERVAL = 2000
+const ENEMY_HITBOX_RATIO = 0.8
+const ENEMY_HITBOX_MIN = 12
 const INTERACT_RANGE = 80
 const FADE_MS = 350
 const SAVE_VERSION = 2
 const BATTLE_ACK_WATCHDOG_MS = 1500
+const MEDITATE_TICK_MS = 2000
 
 // ===================================================================
 // 多地图系统（world-maps 分支）：地图来自 content/maps/*.json DSL，
@@ -84,6 +89,9 @@ export class WorldScene extends Phaser.Scene {
   private transitioning = false
   private battleGraceUntil = 0
   private battleAcked = false
+  private meditating = false
+  private meditateMult = 1
+  private meditateTimer: Phaser.Time.TimerEvent | undefined
   // ==== rich-graphics ====
   private heroDust: { setMoving: (moving: boolean) => void } | null = null
   private heroDir: 'down' | 'up' | 'side' = 'down'
@@ -348,9 +356,54 @@ export class WorldScene extends Phaser.Scene {
     attachNpcLife(this, this.npcs.map((n) => n.sprite))
   }
 
+  /** setScale 不缩放物理体：按缩放后视觉尺寸重建命中盒（居中收窄），保证任意方向接触都能触发遭遇 */
+  private fitEnemyHitbox(wolf: Phaser.Physics.Arcade.Sprite, scale: number): void {
+    const body = wolf.body as Phaser.Physics.Arcade.Body
+    const w = wolf.width * scale
+    const h = wolf.height * scale
+    const bw = Math.max(ENEMY_HITBOX_MIN, Math.round(w * ENEMY_HITBOX_RATIO))
+    const bh = Math.max(ENEMY_HITBOX_MIN, Math.round(h * ENEMY_HITBOX_RATIO))
+    body.setSize(bw, bh)
+    body.setOffset(Math.round((w - bw) / 2), Math.round((h - bh) / 2))
+  }
+
+  /** 打坐吐纳：移动/战斗/对话即打断；恢复速率随区域灵气密度放大 */
+  private toggleMeditate(): void {
+    if (this.meditating) {
+      this.stopMeditate()
+      return
+    }
+    if (this.battleActive || this.transitioning || this.dialogueOpen) return
+    this.meditating = true
+    this.meditateMult = regionQiDensity(this.gameMap.regionId)
+    this.player?.setVelocity(0, 0)
+    this.joyVec = { x: 0, y: 0 }
+    this.meditateTimer = this.time.addEvent({
+      delay: MEDITATE_TICK_MS,
+      loop: true,
+      callback: () => {
+        let gained = { hp: 0, qi: 0 }
+        updatePlayer((p) => {
+          const r = meditateTick(p, this.meditateMult)
+          gained = { hp: r.hp, qi: r.qi }
+          return r.player
+        })
+        bus.emit('meditate:tick', { ...gained, mult: this.meditateMult })
+      },
+    })
+    bus.emit('meditate:state', { active: true, mult: this.meditateMult })
+  }
+
+  private stopMeditate(): void {
+    if (!this.meditating) return
+    this.meditating = false
+    this.meditateTimer?.remove()
+    this.meditateTimer = undefined
+    bus.emit('meditate:state', { active: false, mult: this.meditateMult })
+  }
+
   /** 妖兽：按 DSL 出生点游荡，越界则折返 */
-  private spawnEnemyWolves(): void {
-    this.wolves = this.physics.add.group()
+  private spawnEnemyWolves(): void {    this.wolves = this.physics.add.group()
     this.gameMap.enemySpawns.forEach(({ enemyId, x, y, radius }) => {
       const wx = x * TILE + TILE / 2
       const wy = y * TILE + TILE / 2
@@ -358,6 +411,7 @@ export class WorldScene extends Phaser.Scene {
       const vis = enemyVisualFor(enemyId)
       const wolf = this.wolves.create(wx, wy, vis.tex) as Phaser.Physics.Arcade.Sprite
       wolf.setScale(vis.scale)
+      this.fitEnemyHitbox(wolf, vis.scale)
       wolf.setCollideWorldBounds(true)
       if (vis.boss) bossAura(this, wx, wy)
       else idleBob(this, wolf, 1.2)
@@ -387,7 +441,6 @@ export class WorldScene extends Phaser.Scene {
     })
     this.physics.add.collider(this.wolves, this.obstacles!)
     this.physics.add.collider(this.wolves, this.waterBlockers)
-    this.physics.add.collider(this.player!, this.wolves)
     this.physics.add.overlap(this.player!, this.wolves, (_p, wolfObj) => {
       const wolf = wolfObj as Phaser.Physics.Arcade.Sprite
       if (this.battleActive || this.transitioning || this.dialogueOpen) return
@@ -395,6 +448,7 @@ export class WorldScene extends Phaser.Scene {
       this.activeEnemy = wolf
       this.battleActive = true
       this.battleAcked = false
+      this.stopMeditate()
       this.player!.setVelocity(0, 0)
       this.joyVec = { x: 0, y: 0 }
       this.time.delayedCall(BATTLE_ACK_WATCHDOG_MS, () => {
@@ -442,17 +496,19 @@ export class WorldScene extends Phaser.Scene {
       bus.on('joystick:move', (v) => (this.joyVec = v)),
       bus.on('joystick:end', () => (this.joyVec = { x: 0, y: 0 })),
       // 仅当对话面板确认打开后才冻结世界（修复无对话 NPC 的软锁）
-      bus.on('dialogue:state', ({ open }) => {
+        bus.on('dialogue:state', ({ open }) => {
         this.dialogueOpen = open
         if (open) {
           this.joyVec = { x: 0, y: 0 }
           this.prompt.setVisible(false)
+          this.stopMeditate()
         }
       }),
       // ENG-5：手动存/读档
       bus.on('save:write', ({ slot }) => void writeSave(this.snapshotSave(), slot as SlotId)),
       bus.on('save:load', ({ slot }) => void this.loadFromSlot(slot as SlotId)),
       bus.on('battle:opened', () => (this.battleAcked = true)),
+      bus.on('meditate:toggle', () => this.toggleMeditate()),
       bus.on('battle:end', ({ win, fled }) => {
         this.battleActive = false
         // 战斗结束后短暂免遭遇窗口，防止贴身妖兽瞬间再开战
@@ -484,6 +540,12 @@ export class WorldScene extends Phaser.Scene {
 
   update(): void {
     if (!this.ready || !this.player?.body || this.transitioning) return
+    if (this.meditating) {
+      const k = this.keyState()
+      if (Math.abs(this.joyVec.x) + Math.abs(this.joyVec.y) + Math.abs(k.x) + Math.abs(k.y) > 0.01) {
+        this.stopMeditate()
+      }
+    }
     if (this.dialogueOpen || this.battleActive) {
       this.player.setVelocity(0, 0)
       return
