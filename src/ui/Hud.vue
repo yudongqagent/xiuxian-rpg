@@ -12,6 +12,12 @@ import { ITEMS } from '../systems/itemBook'
 import { getTrackedQuest, type TrackedQuestView } from '../systems/questRuntime'
 
 defineEmits<{ 'open-inventory': []; 'open-quests': []; 'open-saves': [] }>()
+const muted = ref(localStorage.getItem('xj-muted') === '1')
+function toggleMute(): void {
+  import('../systems/audio').then((m) => {
+    muted.value = m.toggleMute()
+  })
+}
 
 const pos = ref({ x: 0, y: 0 })
 const player = ref(getPlayer())
@@ -43,6 +49,7 @@ function pctOf(v: number, max: number): string {
         {{ player.exp }}/{{ expToNext(player.level) }}</span>
     </div>
     <button class="btn" @click="$emit('open-saves')">存档</button>
+    <button class="btn" @click="toggleMute">{{ muted ? '🔇' : '🔊' }}</button>
     <button class="btn" @click="$emit('open-quests')">任务</button>
     <button class="btn" @click="$emit('open-inventory')">背包</button>
     <div class="coords">{{ Math.floor(pos.x / 32) }},{{ Math.floor(pos.y / 32) }}</div>

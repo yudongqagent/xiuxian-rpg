@@ -13,6 +13,7 @@ import ShopPanel from './ui/ShopPanel.vue'
 import QuestToast from './ui/QuestToast.vue'
 import TitleSplash from './ui/TitleSplash.vue'
 import BattleTransition from './ui/BattleTransition.vue'
+import { bindAudioEvents, initAudio } from './systems/audio'
 import { initQuestRuntime } from './systems/questRuntime'
 import { bus } from './engine/eventBus'
 
@@ -39,6 +40,7 @@ function onAppKey(e: KeyboardEvent): void {
 const booting = ref(false)
 let game: ReturnType<(typeof import('./engine/game'))['createGame']> | undefined
 let disposeQuests: (() => void) | undefined
+let disposeAudio: (() => void) | undefined
 
 /** QA-6：Phaser 仅在点击「开始游戏」后动态加载，首屏不含引擎 */
 async function startGame(): Promise<void> {
@@ -57,10 +59,13 @@ onMounted(() => {
     shopNpcId.value = npcId
   })
   window.addEventListener('keydown', onAppKey)
+  initAudio()
+  disposeAudio = bindAudioEvents()
 })
 onUnmounted(() => {
   game?.destroy(true)
   disposeQuests?.()
+  disposeAudio?.()
   unShop?.()
   window.removeEventListener('keydown', onAppKey)
 })

@@ -45,7 +45,7 @@
 | GFX-4 | 动态环境（水面波光/树摇/传送门脉冲/尘土粒子） | M1 | ✅ | G4 截图+像素比对 | 同上 |
 | GFX-5 | 场景装饰物（房屋/桥/墙）与区域色调氛围+暗角 | M1 | ✅ | G4/G5 | world-maps + rich-graphics |
 | GFX-6 | 区域进入横幅 + 平滑过场淡入淡出 | M1 | ✅ | G4 | qa-local 12/12 |
-| GFX-7 | 音效/BGM（含战斗音） | M4 | ⬜ | G5 抽查 | — |
+| GFX-7 | 音效/BGM（程序化五声音阶 BGM + 战斗/任务/商店 SFX，静音开关持久化） | M4 | ✅（提前交付） | G4/G5 | feat-audio |
 
 ### C. 世界与地图 `content/maps/` `src/systems/maps.ts`
 
@@ -190,6 +190,8 @@
 | 2026-08-22 | hotfix-playtest：对抗性回归修复——商店购买计入任务收集（item:acquired）、岳堂主真对话、restoreQuests 广播刷新追踪条、妖兽仇恨追击、山道东侧门户加宽 | 已发布 |
 
 | 2026-08-22 | feat-sidequests：16 条支线全通——5 名支线 NPC 入世+对话、百年灵芝/海兽内丹掉落来源补全 | 已发布 |
+
+| 2026-08-22 | feat-audio：程序化 BGM/SFX + 静音开关；pack:itch 打包脚本（release/xiuxian-rpg-itch.zip 475KB，上传 itch.io 需账号手动操作） | 已发布 |
 
 > 集成约定：功能分支一律从最新 main 切出；集成在 release-* 工作树完成，冲突解决后跑满 G1–G4 再快进 main 发布。
 

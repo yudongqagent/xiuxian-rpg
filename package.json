@@ -10,7 +10,8 @@
     "validate": "tsx scripts/validate.ts",
     "check:combat": "tsx scripts/combat-check.ts",
     "check:quest": "tsx scripts/quest-check.ts",
-    "qa:local": "node scripts/qa-local.mjs"
+    "qa:local": "node scripts/qa-local.mjs",
+    "pack:itch": "tsx scripts/pack-itch.ts"
   },
   "dependencies": {
     "phaser": "^3.90.0",
@@ -20,6 +21,7 @@
   "devDependencies": {
     "@types/node": "^26.2.0",
     "@vitejs/plugin-vue": "^5.2.1",
+    "fflate": "^0.8.3",
     "tsx": "^4.19.2",
     "typescript": "~5.7.2",
     "vite": "^6.0.7",
