@@ -195,6 +195,8 @@
 
 | 2026-08-22 | fix-realm：关键进度修复——realmLabel 扩展至筑基（14+）且 questRuntime 首次接入玩家等级→境界同步；此前 qm_05/qm_06 筑基前置永久无法满足 | 已发布 |
 
+| 2026-08-22 | fix-realm 发布验证：线上 8/8（index-B-oZ80_m.js）；qa-live 移动检查稳定性修复 | 已发布 |
+
 > 集成约定：功能分支一律从最新 main 切出；集成在 release-* 工作树完成，冲突解决后跑满 G1–G4 再快进 main 发布。
 
 | 2026-08-22 | release-m1 集成四分支：world-maps→combat-depth→quest-engine→rich-graphics；修 5 处冲突 + 3 处集成缺陷（validate 地图块丢失、WorldScene 括号、area:enter 可选 regionId）；qa-local.mjs 入库并 12/12 通过 | 待发布 |
