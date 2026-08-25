@@ -253,7 +253,11 @@ function expect(label: string, cond: boolean): void {
 {
   expect('realmLabel(13)=炼气十三层', realmLabel(13) === '炼气十三层')
   expect('realmLabel(14)=筑基初期', realmLabel(14) === '筑基初期')
-  expect('realmLabel(20)=筑基圆满', realmLabel(20) === '筑基圆满')
+  expect('realmLabel(17)=筑基圆满', realmLabel(17) === '筑基圆满')
+  expect('realmLabel(18)=结丹初期', realmLabel(18) === '结丹初期')
+  expect('realmLabel(22)=元婴初期', realmLabel(22) === '元婴初期')
+  expect('realmLabel(26)=化神初期', realmLabel(26) === '化神初期')
+  expect('realmLabel(30)=化神圆满·渡劫', realmLabel(30) === '化神圆满·渡劫')
   expect('筑基初期序数 > 炼气十三层', parseRealmOrdinal('筑基初期') > parseRealmOrdinal('炼气十三层'))
   const q5 = QUESTS['qm_05_zhengmo_zhanyi']
   if (q5) {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { bus } from '../engine/eventBus'
 import type { Item } from '../systems/schemas'
 import {
@@ -64,10 +64,46 @@ function safeSkill(raw: unknown): { id: string; name: string; grade: string; kin
   }
 }
 
-const tab = ref<'items' | 'skills' | 'alchemy'>('items')
+const tab = ref<'items' | 'skills' | 'alchemy' | 'garden'>('items')
 const player = ref(getPlayer())
 const unsub = subscribePlayer(() => (player.value = getPlayer()))
 onUnmounted(unsub)
+
+// ==== 药圃：每秒刷新倒计时 ====
+import { gardenView, plantHerb, ripenAll, harvestAll, GROW_MS } from '../systems/garden'
+const nowMs = ref(Date.now())
+let gardenTimer: ReturnType<typeof setInterval> | undefined
+function startGardenTick(): void {
+  if (!gardenTimer) gardenTimer = setInterval(() => (nowMs.value = Date.now()), 1000)
+}
+function stopGardenTick(): void {
+  if (gardenTimer) {
+    clearInterval(gardenTimer)
+    gardenTimer = undefined
+  }
+}
+watch(tab, (t) => (t === 'garden' ? startGardenTick() : stopGardenTick()), { immediate: true })
+onUnmounted(stopGardenTick)
+const garden = computed(() => gardenView(player.value.garden ?? { plots: [null, null, null, null], drops: 0, bottleAt: Date.now() }, nowMs.value))
+const seedCount = computed(() => player.value.inventory['qi_xie_ling_cao'] ?? 0)
+
+function onPlant(slot: number): void {
+  updatePlayer((p) => plantHerb(p, slot, Date.now()).player)
+}
+function onRipen(): void {
+  const r = ripenAll(getPlayer(), Date.now())
+  updatePlayer(() => r.player)
+  if (r.ripened > 0) bus.emit('quest:notify', { text: `瓶中绿液催熟灵植 ×${r.ripened}`, kind: 'success' })
+}
+function onHarvest(): void {
+  const r = harvestAll(getPlayer(), Date.now())
+  updatePlayer(() => r.player)
+  const total = Object.values(r.harvested).reduce((a, b) => a + b, 0)
+  for (const [id, count] of Object.entries(r.harvested)) {
+    bus.emit('item:acquired', { itemId: id, count })
+  }
+  if (total > 0) bus.emit('quest:notify', { text: `采收灵药 ×${total}`, kind: 'success' })
+}
 
 const eff = computed(() =>
   effectiveStats(player.value.level, player.value.equipped, (id) => ITEM_BOOK[id]),
@@ -113,6 +149,7 @@ const skills = computed(() =>
         <button :class="{ on: tab === 'items' }" @click="tab = 'items'">物品</button>
         <button :class="{ on: tab === 'skills' }" @click="tab = 'skills'">功法</button>
         <button :class="{ on: tab === 'alchemy' }" @click="tab = 'alchemy'">炼丹</button>
+        <button :class="{ on: tab === 'garden' }" @click="tab = 'garden'">药圃</button>
       </nav>
       <button class="close" @click="$emit('close')">✕</button>
     </header>
@@ -145,7 +182,7 @@ const skills = computed(() =>
       </li>
       <p v-if="items.length === 0" class="empty">囊中空空</p>
     </ul>
-    <ul v-else>
+    <ul v-else-if="tab === 'skills'">
       <li v-for="s in skills" :key="s.id">
         <span>{{ s.name }}<small class="desc">{{ s.description.slice(0, 24) }}……</small></span>
         <small>{{ s.grade }} · {{ s.kind }}</small>
@@ -170,6 +207,28 @@ const skills = computed(() =>
         </small>
       </div>
       <p v-if="RECIPES.length === 0" class="empty">暂无丹方</p>
+    </div>
+    <div v-if="tab === 'garden'" class="garden">
+      <p class="gdesc">神秘小瓶于月光中凝出绿液——每半个时辰一滴（上限五滴），一滴可催熟全部灵植。播下七叶灵草，须臾之间，一株化三。</p>
+      <p class="drops">瓶中绿液：{{ garden.drops }} / 5</p>
+      <div class="plots">
+        <div v-for="(pl, idx) in garden.plots" :key="idx" class="plot" :class="{ mature: pl.mature }">
+          <template v-if="!pl.itemId">
+            <span class="pempty">空畦</span>
+            <button class="ink-btn" :disabled="seedCount < 1" @click="onPlant(idx)">
+              播种（灵草×1，余{{ seedCount }}）
+            </button>
+          </template>
+          <template v-else-if="pl.mature">
+            <span class="pmature">灵草已成</span>
+            <button class="ink-btn" @click="onHarvest()">采 收</button>
+          </template>
+          <template v-else>
+            <span class="pgrow">生长中 {{ Math.ceil(pl.remainingMs / 60000) }} 刻</span>
+            <button class="ink-btn" :disabled="garden.drops < 1" @click="onRipen()">绿液催熟</button>
+          </template>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -296,5 +355,57 @@ small {
 }
 .mats .lack {
   color: #e08a7a;
+}
+.garden {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.gdesc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.7;
+  opacity: 0.75;
+}
+.drops {
+  margin: 0;
+  font-size: 14px;
+  color: #9fe0a9;
+  font-family: var(--font-display);
+}
+.plots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.plot {
+  border: 1px solid rgba(139, 105, 20, 0.5);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+.plot.mature {
+  border-color: #9fe0a9;
+}
+.pempty {
+  opacity: 0.5;
+}
+.pmature {
+  color: #9fe0a9;
+}
+.pgrow {
+  color: #7ec8e8;
+}
+.plot .ink-btn {
+  font-size: 11px;
+  min-height: 32px;
+  padding: 4px 8px;
+}
+.plot .ink-btn:disabled {
+  opacity: 0.4;
 }
 </style>

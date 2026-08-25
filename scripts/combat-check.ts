@@ -22,11 +22,13 @@ import {
 } from '../src/systems/combat'
 import {
   addItem,
+  attemptBreakthrough,
   createPlayer,
   effectiveStats,
   equipItem,
   expToNext,
   fromPlayerSave,
+  gateAt,
   grantExp,
   realmLabel,
   removeItem,
@@ -38,6 +40,7 @@ import type { Enemy, Item } from '../src/systems/schemas'
 import { ItemSchema, SkillSchema } from '../src/systems/schemas'
 import { decodeSave, encodeSave, type SaveData } from '../src/engine/save'
 import { canCraft, craft } from '../src/systems/alchemy'
+import { GROW_MS, harvestAll, plantHerb, ripenAll } from '../src/systems/garden'
 import { buyItem, sellItem } from '../src/systems/player'
 import type { Recipe } from '../src/systems/schemas'
 import huodanShuJson from '../content/skills/huodan_shu.json'
@@ -216,8 +219,49 @@ expect('玩家攻击锚点为10', PLAYER_BASE_STATS.atk === 10)
       realmLabel(12) === '炼气十二层' &&
       realmLabel(13) === '炼气十三层' &&
       realmLabel(14) === '筑基初期' &&
-      realmLabel(99) === '筑基圆满',
+      realmLabel(17) === '筑基圆满' &&
+      realmLabel(18) === '结丹初期' &&
+      realmLabel(25) === '元婴圆满' &&
+      realmLabel(26) === '化神初期' &&
+      realmLabel(30) === '化神圆满·渡劫',
   )
+  const gateP = grantExp({ ...p0, level: 13, exp: 0 }, expToNext(13) + 999)
+  expect(
+    '大境界门槛修为封顶（须突破仪式）',
+    gateP.player.level === 13 && gateP.player.exp === expToNext(13) && gateP.levelsGained === 0,
+  )
+  const zhuJi = { ...gateP.player, qi: statsForLevel(13).maxQi, inventory: { zhu_ji_dan: 1 } }
+  const okBreak = attemptBreakthrough(zhuJi, gateAt(13)!, undefined, () => 0.1)
+  expect(
+    '突破成功晋阶筑基',
+    okBreak.success && okBreak.player.level === 14 && (okBreak.player.inventory['zhu_ji_dan'] ?? 0) === 0,
+  )
+  const failBreak = attemptBreakthrough(zhuJi, gateAt(13)!, undefined, () => 0.999)
+  expect(
+    '突破失败耗丹重伤不堕境界',
+    !failBreak.success &&
+      failBreak.player.level === 13 &&
+      failBreak.player.hp === Math.ceil(statsForLevel(13).maxHp * 0.3) &&
+      failBreak.player.qi === 0,
+  )
+  const noPill = attemptBreakthrough({ ...gateP.player, qi: statsForLevel(13).maxQi }, gateAt(13)!, undefined)
+  expect('无丹药不可冲关', noPill.reason === 'no_pill')
+  // 掌天瓶药圃：播种→绿液催熟→采收三倍
+  const now = Date.now()
+  const gardener = createPlayer()
+  const planted = plantHerb(gardener, 0, now)
+  expect('药圃播种消耗灵草', planted.ok && (planted.player.inventory['qi_xie_ling_cao'] ?? 0) === 3)
+  const notMature = harvestAll(planted.player, now + 1000)
+  expect('未成熟不可采收', Object.keys(notMature.harvested).length === 0)
+  const ripened = ripenAll(planted.player, now + 1000)
+  expect('绿液催熟（消耗一滴）', ripened.ripened === 1 && ripened.player.garden.drops === 0)
+  const harvested = harvestAll(ripened.player, now + 1000)
+  expect('采收三倍产出', (harvested.player.inventory['qi_xie_ling_cao'] ?? 0) === 6)
+  const noDrops = ripenAll(harvested.player, now + 2000)
+  expect('绿液不足不可催熟', noDrops.ripened === 0)
+  const later = plantHerb(harvested.player, 1, now)
+  const matured = harvestAll(later.player, now + GROW_MS + 1)
+  expect('自然成熟可采收', (matured.player.inventory['qi_xie_ling_cao'] ?? 0) === 8)
   expect(
     '敌人经验取自模板或按stats推导',
     expReward(spider) === 16 && expReward(wolf) === Math.round((30 + 12 + 2) / 5),

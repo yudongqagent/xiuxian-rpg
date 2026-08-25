@@ -186,7 +186,7 @@ function intentFor(enemy: EnemyCombatant): string {
 function makePlayer(opts: BattleOptions): PlayerCombatant {
   const s = opts.stats ?? PLAYER_BASE_STATS
   return {
-    name: opts.name ?? '张铁柱',
+    name: opts.name ?? '韩立',
     maxHp: s.maxHp,
     hp: Math.min(opts.hp ?? s.maxHp, s.maxHp),
     maxQi: s.maxQi,
@@ -222,7 +222,7 @@ export function createBattle(
       intent: '',
     },
     turn: 1,
-    log: [{ text: LOG.battleStart(opts.name ?? '张铁柱', template.name), kind: 'system' }],
+    log: [{ text: LOG.battleStart(opts.name ?? '韩立', template.name), kind: 'system' }],
     over: false,
     win: false,
     fled: false,

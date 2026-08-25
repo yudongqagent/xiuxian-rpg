@@ -114,6 +114,7 @@ export class WorldScene extends Phaser.Scene {
   private knockbackUntil = 0
   private meditating = false
   private meditateMult = 1
+  private meditateTickNo = 0
   private meditateTimer: Phaser.Time.TimerEvent | undefined
   // ==== rich-graphics ====
   private heroDust: { setMoving: (moving: boolean) => void } | null = null
@@ -277,6 +278,7 @@ export class WorldScene extends Phaser.Scene {
           tile: [Math.round(z.zone.x / TILE), Math.round(z.zone.y / TILE)],
           lockQuest: z.lockQuest,
         })),
+      garden: () => getPlayer().garden,
     }
     bus.emit('map:minimap', {
       rows: this.gameMap.rows,
@@ -484,10 +486,11 @@ export class WorldScene extends Phaser.Scene {
       delay: MEDITATE_TICK_MS,
       loop: true,
       callback: () => {
-        let gained = { hp: 0, qi: 0 }
+        this.meditateTickNo += 1
+        let gained = { hp: 0, qi: 0, exp: 0 }
         updatePlayer((p) => {
-          const r = meditateTick(p, this.meditateMult)
-          gained = { hp: r.hp, qi: r.qi }
+          const r = meditateTick(p, this.meditateMult, this.meditateTickNo)
+          gained = { hp: r.hp, qi: r.qi, exp: r.exp }
           return r.player
         })
         bus.emit('meditate:tick', { ...gained, mult: this.meditateMult })

@@ -4,6 +4,7 @@
  * 数值曲线锚定 GDD §10：炼气一层 攻 10。
  */
 import { PLAYER_BASE_STATS } from './combat'
+import { createGarden, type Garden } from './garden'
 import type { PlayerSave } from '../engine/save'
 
 export interface Equipped {
@@ -22,6 +23,8 @@ export interface PlayerState {
   skills: string[]
   /** INV-3：已装备武器/防具（itemId；物品仍保留在背包） */
   equipped: Equipped
+  /** 掌天瓶药圃（additive，旧档缺省由 garden.ts 兜底创建） */
+  garden: Garden
 }
 
 /** INV-3：基础属性 + 装备加成。lookup 由调用方注入（UI 用全量物品表，测试用夹具）。 */
@@ -63,7 +66,13 @@ export function unequipItem(p: PlayerState, slot: keyof Equipped): PlayerState {
 
 export const STARTING_SKILLS = ['huodan_shu'] as const
 export const STARTING_LINGSHI = 20
-export const STARTING_INVENTORY: Record<string, number> = { huiqi_san: 3, huichun_san: 2, tie_jian: 1, qi_xie_ling_cao: 4 }
+export const STARTING_INVENTORY: Record<string, number> = {
+  huiqi_san: 3,
+  huichun_san: 2,
+  tie_jian: 1,
+  qi_xie_ling_cao: 4,
+  xiao_lv_ping: 1,
+}
 
 const EXP_BASE = 30
 const EXP_STEP = 20
@@ -94,12 +103,52 @@ export function expToNext(level: number): number {
 const REALM_NUMERALS = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二', '十三']
 const REALM_MAX_LAYER = REALM_NUMERALS.length
 
-/** 境界标签：炼气 1-13 层 → 筑基初期/中期/后期/圆满（14+）。字符串需与 quests.parseRealmOrdinal 兼容。 */
+/** 大境界门槛所在等级：该级修为圆满后须行突破仪式方可跨入下一大境界 */
+export const BREAKTHROUGH_GATES: ReadonlySet<number> = new Set([13, 17, 21, 25])
+
+const REALM_STAGES = ['初期', '中期', '后期', '圆满'] as const
+
+/** 境界标签：炼气 1-13 层 → 筑基/结丹/元婴/化神 初期~圆满。字符串需与 quests.parseRealmOrdinal 兼容。 */
 export function realmLabel(level: number): string {
   if (level <= REALM_MAX_LAYER) return `炼气${REALM_NUMERALS[level - 1]}层`
-  const zhu = level - REALM_MAX_LAYER
-  if (zhu <= 3) return `筑基${(['初期', '中期', '后期'] as const)[zhu - 1]}`
-  return '筑基圆满'
+  const idx = level - REALM_MAX_LAYER - 1
+  if (idx >= 16) return '化神圆满·渡劫'
+  const realms = ['筑基', '结丹', '元婴', '化神'] as const
+  const realm = realms[Math.floor(idx / 4)]
+  const stage = REALM_STAGES[idx % 4]
+  return `${realm}${stage}`
+}
+
+/** 大境界门槛信息：跨入的大境界名、所需丹药、基础成功率（GDD §2.1） */
+export interface GateInfo {
+  fromLevel: number
+  realm: string
+  pillId: string
+  pillName: string
+  baseChance: number
+}
+
+const GATE_INFO: Record<number, GateInfo> = {
+  13: { fromLevel: 13, realm: '筑基', pillId: 'zhu_ji_dan', pillName: '筑基丹', baseChance: 0.6 },
+  17: { fromLevel: 17, realm: '结丹', pillId: 'huangling_dan', pillName: '黄龙丹', baseChance: 0.55 },
+  21: { fromLevel: 21, realm: '元婴', pillId: 'xi_sui_dan', pillName: '洗髓丹', baseChance: 0.5 },
+  25: { fromLevel: 25, realm: '化神', pillId: 'xi_sui_dan', pillName: '洗髓丹×2', baseChance: 0.45 },
+}
+
+export function gateAt(level: number): GateInfo | null {
+  return GATE_INFO[level] ?? null
+}
+
+/** 机缘加成：灵脉宝地突破额外成功率（GDD §2.1），regionId → 加成 */
+const LUCKY_SPOTS: Record<string, number> = {
+  shanggu_dongfu: 0.15,
+  huangfeng_gu: 0.05,
+}
+
+export function breakthroughChance(gate: GateInfo, regionId: string | undefined, pillCount: number): number {
+  const lucky = (regionId && LUCKY_SPOTS[regionId]) || 0
+  const pillBonus = Math.min(pillCount - 1, 2) * 0.05
+  return Math.min(0.95, gate.baseChance + lucky + pillBonus)
 }
 
 export function createPlayer(): PlayerState {
@@ -113,6 +162,7 @@ export function createPlayer(): PlayerState {
     inventory: { ...STARTING_INVENTORY },
     skills: [...STARTING_SKILLS],
     equipped: { weapon: null, armor: null },
+    garden: createGarden(Date.now()),
   }
 }
 
@@ -125,16 +175,24 @@ function restoreRatio(p: PlayerState): PlayerState {
   }
 }
 
-/** 结算经验并连升多级；每级回复部分气血/灵气，剩余经验滚入下一级 */
+/** 结算经验并连升多级；每级回复部分气血/灵气，剩余经验滚入下一级。
+ *  大境界门槛级（13/17/21/25）修为封顶于圆满值，须行突破仪式方可再进一步 */
 export function grantExp(p: PlayerState, amount: number): { player: PlayerState; levelsGained: number } {
   let next: PlayerState = { ...p, inventory: { ...p.inventory }, skills: [...p.skills] }
   next.exp += amount
   let gained = 0
   while (next.level < MAX_LEVEL && next.exp >= expToNext(next.level)) {
+    if (BREAKTHROUGH_GATES.has(next.level)) {
+      next.exp = expToNext(next.level)
+      break
+    }
     next.exp -= expToNext(next.level)
     next.level += 1
     gained += 1
     next = restoreRatio(next)
+  }
+  if (next.level < MAX_LEVEL && BREAKTHROUGH_GATES.has(next.level)) {
+    next.exp = Math.min(next.exp, expToNext(next.level))
   }
   return { player: next, levelsGained: gained }
 }
@@ -176,6 +234,48 @@ export function sellItem(p: PlayerState, itemId: string, unitPrice: number): Pla
   return { ...p, lingshi: p.lingshi + Math.max(1, unitPrice), inventory: inv, equipped }
 }
 
+export interface BreakthroughResult {
+  player: PlayerState
+  success: boolean
+  chance: number
+  reason?: 'not_gate' | 'exp_not_full' | 'qi_not_full' | 'no_pill'
+}
+
+/** 大境界突破仪式（GDD §2.1）：条件=修为圆满+灵气圆满+丹药；失败耗丹重伤，绝不降境界删档 */
+export function attemptBreakthrough(
+  p: PlayerState,
+  gate: GateInfo,
+  regionId: string | undefined,
+  rng: () => number = Math.random,
+): BreakthroughResult {
+  const s = statsForLevel(p.level)
+  if (p.level !== gate.fromLevel) return { player: p, success: false, chance: 0, reason: 'not_gate' }
+  if (p.exp < expToNext(p.level)) return { player: p, success: false, chance: 0, reason: 'exp_not_full' }
+  const pillNeed = gate.pillId === 'xi_sui_dan' && gate.realm === '化神' ? 2 : 1
+  if ((p.inventory[gate.pillId] ?? 0) < pillNeed) {
+    return { player: p, success: false, chance: 0, reason: 'no_pill' }
+  }
+  if (p.qi < s.maxQi) return { player: p, success: false, chance: 0, reason: 'qi_not_full' }
+  const chance = breakthroughChance(gate, regionId, p.inventory[gate.pillId] ?? 0)
+  const inv = { ...p.inventory }
+  inv[gate.pillId] = (inv[gate.pillId] ?? 0) - pillNeed
+  if (inv[gate.pillId] <= 0) delete inv[gate.pillId]
+  if (rng() >= chance) {
+    return {
+      player: { ...p, inventory: inv, hp: Math.max(1, Math.ceil(s.maxHp * 0.3)), qi: 0 },
+      success: false,
+      chance,
+    }
+  }
+  const advanced: PlayerState = { ...p, inventory: inv, level: p.level + 1, exp: 0 }
+  const ns = statsForLevel(advanced.level)
+  return {
+    player: { ...advanced, hp: ns.maxHp, qi: ns.maxQi },
+    success: true,
+    chance,
+  }
+}
+
 /** 战败惩罚（宽）：重伤回出生点，气血折半、灵气保留 */
 export function respawnPenalty(p: PlayerState): PlayerState {
   const s = statsForLevel(p.level)
@@ -190,14 +290,29 @@ export function syncAfterBattle(p: PlayerState, hp: number, qi: number): PlayerS
 
 export const MEDITATE_QI_PER_TICK = 3
 export const MEDITATE_HP_PER_TICK = 1
+/** 吐纳亦产修为（GDD §8：挂机 ≪ 任务，故每两跳一修为，随灵气密度放大） */
+export const MEDITATE_EXP_EVERY = 2
+
+export interface MeditateResult {
+  player: PlayerState
+  hp: number
+  qi: number
+  exp: number
+}
 
 /** 打坐吐纳（GDD 附录 A：吐纳=恢复灵气的挂机动作）。按区域灵气密度放大，只回血灵不产修为（GDD §8：挂机 ≪ 任务） */
-export function meditateTick(p: PlayerState, qiDensity: number): { player: PlayerState; hp: number; qi: number } {
+export function meditateTick(p: PlayerState, qiDensity: number, tick: number): MeditateResult {
   const s = statsForLevel(p.level)
   const qi = Math.min(s.maxQi - p.qi, Math.round(MEDITATE_QI_PER_TICK * qiDensity))
   const hp = Math.min(s.maxHp - p.hp, Math.round(MEDITATE_HP_PER_TICK * qiDensity))
-  if (qi <= 0 && hp <= 0) return { player: p, hp: 0, qi: 0 }
-  return { player: { ...p, hp: p.hp + hp, qi: p.qi + qi }, hp, qi }
+  let player: PlayerState = { ...p, hp: p.hp + hp, qi: p.qi + qi }
+  let exp = 0
+  if (tick % MEDITATE_EXP_EVERY === 0) {
+    exp = Math.max(1, Math.round(qiDensity / 2))
+    player = grantExp(player, exp).player
+  }
+  if (qi <= 0 && hp <= 0 && exp <= 0) return { player: p, hp: 0, qi: 0, exp: 0 }
+  return { player, hp, qi, exp }
 }
 
 function clampInt(v: number, min: number, max: number): number {
@@ -214,6 +329,7 @@ export function toPlayerSave(p: PlayerState): PlayerSave {
     inventory: { ...p.inventory },
     skills: [...p.skills],
     equipped: { ...p.equipped },
+    garden: { plots: p.garden.plots.map((pl) => (pl ? { ...pl } : null)), drops: p.garden.drops, bottleAt: p.garden.bottleAt },
   }
 }
 
@@ -235,6 +351,7 @@ export function fromPlayerSave(s: PlayerSave | undefined): PlayerState {
       armor: s.equipped?.armor ?? null,
     },
     lingshi: Math.max(0, s.lingshi ?? STARTING_LINGSHI),
+    garden: s.garden ?? fresh.garden,
   }
 }
 

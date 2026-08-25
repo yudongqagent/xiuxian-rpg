@@ -4,6 +4,7 @@ import { bus } from '../engine/eventBus'
 import {
   effectiveStats,
   expToNext,
+  gateAt,
   getPlayer,
   realmLabel,
   subscribePlayer,
@@ -11,7 +12,7 @@ import {
 import { ITEMS } from '../systems/itemBook'
 import { getTrackedQuest, getNextMainQuestHint, type TrackedQuestView } from '../systems/questRuntime'
 
-defineEmits<{ 'open-inventory': []; 'open-quests': []; 'open-saves': []; 'open-map': [] }>()
+defineEmits<{ 'open-inventory': []; 'open-quests': []; 'open-saves': []; 'open-map': []; 'open-breakthrough': [] }>()
 const muted = ref(localStorage.getItem('xj-muted') === '1')
 function toggleMute(): void {
   import('../systems/audio').then((m) => {
@@ -38,6 +39,9 @@ onUnmounted(() => {
 const stats = computed(() =>
   effectiveStats(player.value.level, player.value.equipped, (id) => ITEMS[id]),
 )
+const gateReady = computed(
+  () => Boolean(gateAt(player.value.level)) && player.value.exp >= expToNext(player.value.level),
+)
 
 function pctOf(v: number, max: number): string {
   return `${Math.min(100, Math.round((v / max) * 100))}%`
@@ -57,6 +61,7 @@ function pctOf(v: number, max: number): string {
     <button class="btn" @click="toggleMute">{{ muted ? '🔇' : '🔊' }}</button>
     <button class="btn" @click="$emit('open-quests')">任务</button>
     <button class="btn" @click="$emit('open-inventory')">背包</button>
+    <button v-if="gateReady" class="btn gate" @click="$emit('open-breakthrough')">突破</button>
     <div class="coords">{{ Math.floor(pos.x / 32) }},{{ Math.floor(pos.y / 32) }}</div>
   </div>
   <button v-if="tracked" class="tracker" @click="bus.emit('navigate:quest')">
@@ -109,6 +114,20 @@ function pctOf(v: number, max: number): string {
   background: rgba(26, 18, 11, 0.75);
   color: #e8dcc0;
   font-size: 13px;
+}
+.btn.gate {
+  border-color: #ffd97a;
+  color: #ffd97a;
+  animation: gate-pulse 1.6s ease-in-out infinite;
+}
+@keyframes gate-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 4px 1px rgba(255, 217, 122, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 14px 4px rgba(255, 217, 122, 0.6);
+  }
 }
 .coords {
   font-size: 10px;

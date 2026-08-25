@@ -43,7 +43,7 @@ type GameEvents = {
   /** 打坐吐纳：UI 请求切换；世界层回报状态与每跳恢复量（mult=区域灵气密度） */
   'meditate:toggle': void
   'meditate:state': { active: boolean; mult: number }
-  'meditate:tick': { hp: number; qi: number; mult: number }
+  'meditate:tick': { hp: number; qi: number; exp: number; mult: number }
   /** 自动寻路：请求世界层沿 BFS 路径走向当前任务目标 */
   'navigate:quest': void
   /** 自动寻路：走向指定图块（点击寻路的事件通道） */

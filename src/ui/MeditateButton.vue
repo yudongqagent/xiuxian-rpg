@@ -17,9 +17,10 @@ const unState = bus.on('meditate:state', ({ active: a, mult: m }) => {
   mult.value = m
   if (a) chime(392, 0.12)
 })
-const unTick = bus.on('meditate:tick', ({ hp, qi }) => {
+const unTick = bus.on('meditate:tick', ({ hp, qi, exp }) => {
   if (qi > 0) pushFloater(`+${qi} 灵`, 'qi')
   if (hp > 0) pushFloater(`+${hp} 血`, 'hp')
+  if (exp > 0) pushFloater(`+${exp} 修为`, 'exp')
 })
 
 function pushFloater(text: string, cls: string): void {
@@ -138,6 +139,10 @@ onUnmounted(() => {
 .floater.hp {
   color: #d98a6a;
   animation-delay: 0.12s;
+}
+.floater.exp {
+  color: #cfe8b5;
+  animation-delay: 0.24s;
 }
 @keyframes rise {
   0% {

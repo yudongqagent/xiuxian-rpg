@@ -12,6 +12,7 @@ declare global {
         pos: () => [number, number]
         findPath: (tx: number, ty: number) => Array<[number, number]> | null
         portals: () => Array<{ tile: [number, number]; lockQuest?: string }>
+        garden: () => unknown
       }
     }
   }
