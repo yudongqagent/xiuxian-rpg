@@ -1,0 +1,16 @@
+{
+  "id": "wanbaolou_zhanggui",
+  "name": "万宝楼·法器丹药",
+  "wares": [
+    { "item": "huiqi_san", "price": 8 },
+    { "item": "huichun_san", "price": 12 },
+    { "item": "ju_qi_san", "price": 20 },
+    { "item": "xi_sui_dan", "price": 50 },
+    { "item": "tie_jian", "price": 15 },
+    { "item": "cu_bu_pao", "price": 10 },
+    { "item": "qi_xie_ling_cao", "price": 6 },
+    { "item": "bai_nian_ling_zhi", "price": 15 },
+    { "item": "zhu_ji_dan", "price": 200 },
+    { "item": "yinshen_fu", "price": 30 }
+  ]
+}

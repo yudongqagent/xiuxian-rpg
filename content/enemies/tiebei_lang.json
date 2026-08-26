@@ -1,6 +1,11 @@
 {
   "id": "tiebei_lang",
   "name": "铁背狼",
-  "description": "彩霞山深处的头目级野狼，脊背皮毛硬如铁石，凡刀砍上去只留一道白印。惯于成群围猎，先遣弱狼佯攻，头狼绕后扑喉。",
-  "stats": { "hp": 60, "atk": 12, "def": 5, "speed": 6 }
+  "description": "灰狼群中的头狼，经年厮杀后背部毛发硬如铁甲。寻常刀剑砍上去只能留下一道白印，是炼气中期修士的劲敌。",
+  "stats": { "hp": 60, "atk": 12, "def": 5, "speed": 6 },
+  "exp": 35,
+  "loot": [
+    { "item": "yaodan", "chance": 0.4 },
+    { "item": "bai_nian_ling_zhi", "chance": 0.15 }
+  ]
 }

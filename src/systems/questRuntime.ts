@@ -41,6 +41,8 @@ void import('./contentNames').then((m) => {
   for (const questId of Object.keys(state.active)) {
     bus.emit('quest:updated', { questId, status: getStatus(questId) })
   }
+  syncCollectCounts()
+  bus.emit('names:ready')
 })
 
 let state: QuestState = { ...EMPTY_QUEST_STATE }
@@ -125,10 +127,34 @@ export function requestOffer(questId: string): boolean {
   const res = acceptQuest(state, quest)
   if (!res.ok) return false
   state = res.state
+  syncCollectCounts()
   state.tracked = questId
   emitUpdated(questId, 'active')
   notify(`接取任务「${quest.name}」`)
   return true
+}
+
+/** 收集类步骤进度=当前背包数量（接取前已有的存货同样计入；消耗后进度回落） */
+function syncCollectCounts(): void {
+  const inv = getPlayer().inventory
+  let changed = false
+  for (const [questId, progress] of Object.entries(state.active)) {
+    const quest = getQuest(questId)
+    if (!quest) continue
+    quest.steps.forEach((step, idx) => {
+      if (step.kind !== 'collect') return
+      const target = Math.min(step.count, inv[step.target] ?? 0)
+      if ((progress.counts[idx] ?? 0) !== target) {
+        progress.counts[idx] = target
+        changed = true
+      }
+    })
+  }
+  if (changed) {
+    for (const questId of Object.keys(state.active)) {
+      bus.emit('quest:updated', { questId, status: getStatus(questId) })
+    }
+  }
 }
 
 export function requestTurnIn(questId: string): boolean {
@@ -216,13 +242,24 @@ export function getCompletedQuests(): Quest[] {
 
 export interface TrackedQuestView extends ActiveQuestView {
   objectiveLine: string
+  /** 待交付时为交付人名（追踪条明示交付目标） */
+  turnInGiver: string | null
 }
 
 export function getTrackedQuest(): TrackedQuestView | null {
   const trackedId = resolveTracked(state)
   if (!trackedId || !state.active[trackedId]) return null
   const view = viewActive(trackedId)
-  return { ...view, objectiveLine: currentObjectiveLine(trackedId) ?? '' }
+  const quest = getQuest(trackedId)
+  const turnInGiver =
+    quest && isReadyToTurnInById(trackedId) ? resolveName('npc', quest.giver) : null
+  return {
+    ...view,
+    objectiveLine: turnInGiver
+      ? `回去找${turnInGiver}交付`
+      : (currentObjectiveLine(trackedId) ?? ''),
+    turnInGiver,
+  }
 }
 
 function currentObjectiveLine(questId: string): string | null {
@@ -289,6 +326,7 @@ export function snapshotQuests(): QuestSaveData {
 export function restoreQuests(data: QuestSaveData | undefined): void {
   state = fromSaveData(data, QUEST_IDS)
   // 恢复后广播，HUD 追踪条/任务日志才能立即呈现存档中的进度
+  syncCollectCounts()
   for (const questId of Object.keys(state.active)) {
     bus.emit('quest:updated', { questId, status: getStatus(questId) })
   }
@@ -299,14 +337,21 @@ export function initQuestRuntime(): () => void {
   // 境界与玩家等级联动（此前从未同步，导致筑基前置永远无法满足）
   setPlayerRealm(realmLabel(getPlayer().level))
   const unsubs = [
-    bus.on('player:stats', () => setPlayerRealm(realmLabel(getPlayer().level))),
-    bus.on('dialogue:open', ({ npcId }) => dispatchTrigger({ kind: 'talk', npcId })),
+    bus.on('player:stats', () => {
+      setPlayerRealm(realmLabel(getPlayer().level))
+      syncCollectCounts()
+    }),
+    bus.on('dialogue:open', ({ npcId }) => {
+      dispatchTrigger({ kind: 'talk', npcId })
+      syncCollectCounts()
+    }),
     bus.on('battle:end', ({ win, enemyId }) => {
       if (win && enemyId) dispatchTrigger({ kind: 'kill', enemyId })
     }),
-    bus.on('item:acquired', ({ itemId, count }) =>
-      dispatchTrigger({ kind: 'collect', itemId, count: count ?? 1 }),
-    ),
+    bus.on('item:acquired', ({ itemId, count }) => {
+      dispatchTrigger({ kind: 'collect', itemId, count: count ?? 1 })
+      syncCollectCounts()
+    }),
     bus.on('area:enter', ({ regionId }) => {
       if (regionId) dispatchTrigger({ kind: 'reach', regionId })
     }),

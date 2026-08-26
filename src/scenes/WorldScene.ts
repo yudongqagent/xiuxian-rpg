@@ -1,7 +1,8 @@
 import Phaser from 'phaser'
 import { bus } from '../engine/eventBus'
 import { AUTO_SLOT, loadSave, writeSave, type SlotId } from '../engine/save'
-import { DEFAULT_MAP_ID, getGameMap, isWalkable } from '../systems/maps'
+import { DEFAULT_MAP_ID, getAllMaps, getGameMap, isWalkable } from '../systems/maps'
+import { getNavRoute, portalPath, setNavRoute } from '../systems/nav'
 import type { GameMap } from '../systems/schemas'
 
 type PortalTarget = GameMap['portals'][number]['to']
@@ -16,13 +17,14 @@ import {
   toPlayerSave,
   updatePlayer,
 } from '../systems/player'
-import { regionQiDensity } from '../systems/contentNames'
+import { enemiesDropping, regionQiDensity, resolveName } from '../systems/contentNames'
 // quest-engine：任务进度恢复与入档
 import {
   getTrackedTarget,
   isQuestCompleted,
   restoreQuests,
   snapshotQuests,
+  type TrackedTarget,
 } from '../systems/questRuntime'
 // ==== rich-graphics ====
 import {
@@ -267,6 +269,7 @@ export class WorldScene extends Phaser.Scene {
     this.cameras.main.fadeIn(FADE_MS, 0, 0, 0)
     bus.emit('area:enter', { name: this.gameMap.name, regionId: this.gameMap.regionId })
     this.ready = true
+    this.resumeNavRoute()
     const qa = (window.__xiuxian ??= { bus })
     qa.scene = {
       path: () => this.autoPath.map((p) => [Math.round(p.x), Math.round(p.y)]),
@@ -279,6 +282,12 @@ export class WorldScene extends Phaser.Scene {
           lockQuest: z.lockQuest,
         })),
       garden: () => getPlayer().garden,
+      navDirect: (tx: number, ty: number) => this.startAutoPathTo(tx, ty),
+      flags: () => ({
+        dialogueOpen: this.dialogueOpen,
+        battleActive: this.battleActive,
+        transitioning: this.transitioning,
+      }),
     }
     bus.emit('map:minimap', {
       rows: this.gameMap.rows,
@@ -392,43 +401,79 @@ export class WorldScene extends Phaser.Scene {
       bus.emit('quest:notify', { text: '暂无进行中的任务', kind: 'info' })
       return
     }
-    if (target.kind === 'talk') {
-      const spot = this.gameMap.npcPlacements.find((n) => n.npcId === target.id)
-      if (!spot) {
-        bus.emit('quest:notify', { text: '此人不在本图，先去别处寻访', kind: 'info' })
-        return
-      }
-      this.startAutoPathTo(spot.x, spot.y + 1)
+    const dest = this.resolveTargetLocation(target)
+    if (!dest) {
+      bus.emit('quest:notify', { text: '目标暂无去向', kind: 'info' })
       return
+    }
+    const hops = portalPath(this.mapId, dest.mapId)
+    if (!hops) {
+      bus.emit('quest:notify', { text: `前往${dest.label}的路尚未打通`, kind: 'info' })
+      return
+    }
+    setNavRoute({ targetMapId: dest.mapId, target: dest.tile, label: dest.label, hops })
+    this.followNavRoute()
+  }
+
+  /** 任务目标跨图定位：NPC→出生点、妖兽→刷怪点、收集→掉落来源、抵达→区域地图 */
+  private resolveTargetLocation(target: TrackedTarget): { mapId: string; tile: { x: number; y: number }; label: string } | null {
+    const maps = getAllMaps()
+    if (target.kind === 'talk') {
+      for (const m of maps) {
+        const spot = m.npcPlacements.find((n) => n.npcId === target.id)
+        if (spot) return { mapId: m.id, tile: { x: spot.x, y: spot.y + 1 }, label: resolveName('npc', target.id) }
+      }
+      return null
     }
     if (target.kind === 'reach') {
-      const portal = this.gameMap.portals.find((pt) => getGameMap(pt.to.map).regionId === target.id)
-      if (!portal) {
-        bus.emit('quest:notify', { text: '本图没有通往该处的路', kind: 'info' })
-        return
+      const m = maps.find((mm) => mm.regionId === target.id)
+      return m ? { mapId: m.id, tile: { ...m.spawn }, label: resolveName('region', target.id) } : null
+    }
+    const enemyIds = target.kind === 'kill' ? [target.id] : enemiesDropping(target.id)
+    for (const m of maps) {
+      const spawn = m.enemySpawns.find((sp) => enemyIds.includes(sp.enemyId))
+      if (spawn) {
+        return {
+          mapId: m.id,
+          tile: { x: spawn.x, y: spawn.y },
+          label: resolveName(target.kind === 'kill' ? 'enemy' : 'item', target.id),
+        }
       }
-      if (portal.lockQuest && !isQuestCompleted(portal.lockQuest)) {
-        bus.emit('quest:notify', { text: portal.lockHint ?? '此路尚未开启', kind: 'info' })
-        return
-      }
-      this.startAutoPathTo(portal.x, portal.y)
+    }
+    return null
+  }
+
+  /** 沿路线行走：跨图后由 create() 调本方法续航 */
+  private followNavRoute(): void {
+    const route = getNavRoute()
+    if (!route) return
+    if (route.hops.length === 0) {
+      this.startAutoPathTo(route.target.x, route.target.y)
       return
     }
-    const spawns = this.gameMap.enemySpawns.filter(
-      (s) => target.kind === 'collect' || s.enemyId === target.id,
-    )
-    if (spawns.length === 0) {
-      bus.emit('quest:notify', { text: '目标不在本图，去别处看看', kind: 'info' })
+    const hop = route.hops[0]
+    if (hop.fromMapId !== this.mapId) {
+      route.hops.shift()
+      bus.emit('quest:notify', { text: `前往${route.label}……`, kind: 'info' })
+      return this.followNavRoute()
+    }
+    this.startAutoPathTo(hop.portal.x, hop.portal.y)
+  }
+
+  /** 跨图寻路续航：scene.restart 后按已跨越的传送门推进路线 */
+  private resumeNavRoute(): void {
+    const route = getNavRoute()
+    if (!route) return
+    if (route.targetMapId === this.mapId) {
+      route.hops = []
+      this.followNavRoute()
       return
     }
-    const p = this.player
-    const nearest = spawns.reduce((a, b) =>
-      Phaser.Math.Distance.Between(a.x, a.y, p.x / TILE, p.y / TILE) <
-      Phaser.Math.Distance.Between(b.x, b.y, p.x / TILE, p.y / TILE)
-        ? a
-        : b,
-    )
-    this.startAutoPathTo(nearest.x, nearest.y)
+    if (route.hops[0] && route.hops[0].fromMapId !== this.mapId) {
+      route.hops.shift()
+      bus.emit('quest:notify', { text: `前往${route.label}……`, kind: 'info' })
+    }
+    this.followNavRoute()
   }
 
   private placeNpcs(): void {
@@ -678,6 +723,20 @@ export class WorldScene extends Phaser.Scene {
     return path
   }
 
+  /** autoPath 结束后手动检测是否停在传送门上（补偿 overlap 不触发的情况） */
+  private checkPortalProximity(): void {
+    if (this.transitioning || this.battleActive) return
+    const px = this.player.x
+    const py = this.player.y
+    for (const p of this.portalZones) {
+      if (Math.abs(px - p.zone.x) < TILE / 2 && Math.abs(py - p.zone.y) < TILE / 2) {
+        if (p.lockQuest && !isQuestCompleted(p.lockQuest)) return
+        this.transitionTo(p.to)
+        return
+      }
+    }
+  }
+
   private transitionTo(to: PortalTarget): void {
     this.transitioning = true
     this.autoPath = []
@@ -721,8 +780,14 @@ export class WorldScene extends Phaser.Scene {
       bus.on('battle:opened', () => (this.battleAcked = true)),
       bus.on('meditate:toggle', () => this.toggleMeditate()),
       bus.on('navigate:quest', () => this.navigateToObjective()),
-      bus.on('navigate:tile', ({ x, y }) => this.startAutoPathTo(x, y)),
-      bus.on('joystick:move', () => (this.autoPath = [])),
+      bus.on('navigate:tile', ({ x, y }) => {
+        setNavRoute(null)
+        this.startAutoPathTo(x, y)
+      }),
+      bus.on('joystick:move', () => {
+        this.autoPath = []
+        setNavRoute(null)
+      }),
       bus.on('battle:end', ({ win, fled }) => {
         this.battleActive = false
         // 战斗结束后短暂免遭遇窗口，防止贴身妖兽瞬间再开战
@@ -790,14 +855,22 @@ export class WorldScene extends Phaser.Scene {
     }
     if (this.time.now < this.knockbackUntil) return
     const k = this.keyState()
-    if (k.x !== 0 || k.y !== 0) this.autoPath = []
+    if (k.x !== 0 || k.y !== 0) {
+      this.autoPath = []
+      setNavRoute(null)
+    }
     if (this.autoPath.length > 0) {
       const target = this.autoPath[0]
       const dx = target.x - this.player.x
       const dy = target.y - this.player.y
       if (Math.abs(dx) < WAYPOINT_ARRIVAL_PX && Math.abs(dy) < WAYPOINT_ARRIVAL_PX) {
         this.autoPath.shift()
-        if (this.autoPath.length === 0) this.player.setVelocity(0, 0)
+        if (this.autoPath.length === 0) {
+          this.player.setVelocity(0, 0)
+          const route = getNavRoute()
+          if (route && route.hops.length === 0 && route.targetMapId === this.mapId) setNavRoute(null)
+          this.checkPortalProximity()
+        }
       } else {
         const dir = new Phaser.Math.Vector2(dx, dy).normalize()
         this.player.setVelocity(dir.x * PLAYER_SPEED, dir.y * PLAYER_SPEED)

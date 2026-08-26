@@ -1,6 +1,11 @@
 {
   "id": "modao_dizi",
   "name": "魔道弟子",
-  "description": "魔道六宗入侵越国的先锋修士，一身黑袍绣血纹，行事狠辣不留活口。功法多走阴毒一路，招招直取要害——战场上遇到，能逃则逃。",
-  "stats": { "hp": 200, "atk": 35, "def": 15, "speed": 8 }
+  "description": "修习魔功的低阶弟子，功法诡异、出手狠辣。虽根基不稳，但魔功爆发力极强，大意者往往一招便吃了大亏。",
+  "stats": { "hp": 200, "atk": 35, "def": 15, "speed": 8 },
+  "exp": 100,
+  "loot": [
+    { "item": "yaodan", "chance": 0.5 },
+    { "item": "xi_sui_dan", "chance": 0.25 }
+  ]
 }

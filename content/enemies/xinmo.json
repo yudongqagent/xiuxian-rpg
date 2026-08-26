@@ -2,5 +2,10 @@
   "id": "xinmo",
   "name": "心魔",
   "description": "渡劫者毕生执念所化的心魔，形貌随人而变——你欠过的、怕过的、悔过的，它都知晓。道心不坚者，未战便已败了。渡劫峰上真正的敌人，从来只有这一个。",
-  "stats": { "hp": 3000, "atk": 350, "def": 120, "speed": 15 }
+  "stats": { "hp": 3000, "atk": 350, "def": 120, "speed": 15 },
+  "exp": 3000,
+  "loot": [
+    { "item": "xue_lingzhi", "chance": 0.5 },
+    { "item": "xi_sui_dan", "chance": 0.4 }
+  ]
 }

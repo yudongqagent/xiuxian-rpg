@@ -1,6 +1,11 @@
 {
   "id": "yelang_bangzhong",
   "name": "野狼帮帮众",
-  "description": "野狼帮的马贼喽啰，一身横肉、满脸横刀，烧杀抢掠无恶不作。武功只是三流，胜在亡命——背后那位供奉的修仙者，才是真正该怕的。",
-  "stats": { "hp": 50, "atk": 10, "def": 3, "speed": 5 }
+  "description": "野狼帮的低阶弟子，行事狠辣但修为平平。以多欺少是他们的拿手好戏，一对一反倒没什么胆量。",
+  "stats": { "hp": 50, "atk": 10, "def": 3, "speed": 5 },
+  "exp": 25,
+  "loot": [
+    { "item": "huiqi_san", "chance": 0.3 },
+    { "item": "yaodan", "chance": 0.2 }
+  ]
 }

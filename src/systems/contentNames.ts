@@ -40,6 +40,23 @@ export function regionQiDensity(regionId: string | undefined): number {
   return (regionId && REGION_QI.get(regionId)) || 1
 }
 
+const ITEM_SOURCES = new Map<string, string[]>()
+for (const data of Object.values(
+  import.meta.glob('../../content/enemies/*.json', { eager: true }) as Record<string, unknown>,
+)) {
+  const e = EnemySchema.parse(data)
+  for (const drop of e.loot ?? []) {
+    const list = ITEM_SOURCES.get(drop.item) ?? []
+    list.push(e.id)
+    ITEM_SOURCES.set(drop.item, list)
+  }
+}
+
+/** 掉落该物品的妖兽 id 列表（任务寻路用） */
+export function enemiesDropping(itemId: string): string[] {
+  return ITEM_SOURCES.get(itemId) ?? []
+}
+
 const NAMES: Record<NameKind, Map<string, string>> = {
   npc: NPC_NAMES,
   enemy: ENEMY_NAMES,

@@ -48,6 +48,8 @@ type GameEvents = {
   'navigate:quest': void
   /** 自动寻路：走向指定图块（点击寻路的事件通道） */
   'navigate:tile': { x: number; y: number }
+  /** 内容名称表懒加载完成（HUD 由此刷新「下一步」等含名称的派生文案） */
+  'names:ready': void
   /** 小地图数据：进入地图时发一次全量快照（图块行 + 静态点位，图块坐标） */
   'map:minimap': {
     rows: string[]

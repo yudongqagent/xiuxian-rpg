@@ -2,5 +2,11 @@
   "id": "wuying_mang",
   "name": "雾影蟒",
   "description": "太岳山脉溪谷中的巨蟒，吐纳间喷出毒瘴迷雾，猎物往往在幻觉中一步步走进它盘踞的雾心。蛇躯之力可绞碎碗口粗的树干。",
-  "stats": { "hp": 180, "atk": 25, "def": 10, "speed": 7 }
+  "stats": { "hp": 180, "atk": 25, "def": 10, "speed": 7 },
+  "exp": 90,
+  "special": "poison",
+  "loot": [
+    { "item": "qiannian_lingru", "chance": 0.35 },
+    { "item": "yaodan", "chance": 0.6 }
+  ]
 }

@@ -1,0 +1,12 @@
+{
+  "id": "ma_guanshi",
+  "name": "百药园·灵药",
+  "wares": [
+    { "item": "qi_xie_ling_cao", "price": 5 },
+    { "item": "bai_nian_ling_zhi", "price": 12 },
+    { "item": "xue_lingzhi", "price": 40 },
+    { "item": "huichun_san", "price": 10 },
+    { "item": "ju_qi_san", "price": 18 },
+    { "item": "zi_hou_hua", "price": 25 }
+  ]
+}

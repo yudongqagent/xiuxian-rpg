@@ -186,6 +186,49 @@ try {
     await page.waitForTimeout(300)
   }
 
+  // 7.2 收集进度实时同步：qm_01 需采灵草×5，起始背包已有 4 → 日志应显示 4/5（回归：接任务前存货计入）；
+  //     药圃采收 +3 后 → 5/5 完成且追踪条点名墨大夫
+  {
+    const collectLine = async () => {
+      await page.locator('.hud .btn', { hasText: '任务' }).click()
+      await page.waitForTimeout(500)
+      const lines = await page.locator('.panel', { hasText: '第一章' }).locator('li').allTextContents().catch(() => [])
+      const close = page.locator('.panel .close').first()
+      if (await close.isVisible().catch(() => false)) {
+        await close.click()
+        await page.waitForTimeout(300)
+      }
+      const line = lines.find((t) => t.includes('七叶灵草'))
+      const m = /(\d+)\s*\/\s*(\d+)/.exec(line ?? '')
+      return m ? `${m[1]}/${m[2]}` : null
+    }
+    const before = await collectLine()
+    await page.locator('.hud .btn', { hasText: '背包' }).click()
+    await page.waitForTimeout(500)
+    await page.locator('.panel', { hasText: '储物袋' }).locator('button', { hasText: '药圃' }).click()
+    await page.waitForTimeout(300)
+    await page.locator('.plot button', { hasText: '播种' }).first().click()
+    await page.waitForTimeout(250)
+    await page.locator('.plot button', { hasText: '催熟' }).first().click()
+    await page.waitForTimeout(250)
+    await page.locator('.plot button', { hasText: '采 收' }).first().click()
+    await page.waitForTimeout(500)
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(400)
+    const after = await collectLine()
+    const tracker2 = (await page.locator('.tracker').textContent().catch(() => '')).trim()
+    // 药圃采收后灵草净增（播种 -1、采收 +3）
+    await page.locator('.hud .btn', { hasText: '背包' }).click()
+    await page.waitForTimeout(400)
+    const herbs = await page.locator('.panel', { hasText: '储物袋' }).locator('ul li').allTextContents().catch(() => [])
+    const herbRow = herbs.find((t) => t.includes('七叶灵草'))
+    const herbCount = /×(\d+)/.exec(herbRow ?? '')
+    add('收集进度实时同步+药圃循环', before === '4/5' && after === '5/5' && herbCount && +herbCount[1] === 6,
+      `日志 ${before} → ${after} · 灵草 ×${herbCount?.[1] ?? '?'}`)
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(400)
+  }
+
   // 7.5 打坐吐纳：点击 FAB 进入打坐态并保持；移动即打断（满血灵时无回升属预期，回升由战斗后场景覆盖）
   {
     const readQi = async () => {
@@ -208,44 +251,6 @@ try {
     const activeOff = await fab.evaluate((el) => el.classList.contains('on')).catch(() => true)
     add('打坐吐纳（进入打坐态+移动打断）', fabVisible && activeOn && stillOn && !activeOff,
       `灵 ${qi0} → ${await readQi()} · 打坐=${activeOn} · 保持=${stillOn} · 移动后=${activeOff}`)
-  }
-
-  // 7.8 掌天瓶药圃：播种→绿液催熟→采收，灵草数量净增
-  {
-    await page.keyboard.press('Escape')
-    await page.waitForTimeout(500)
-    const herbCount = async () => {
-      const rows = await page.locator('.panel', { hasText: '储物袋' }).locator('ul li').allTextContents().catch(() => [])
-      const row = rows.find((t) => t.includes('七叶灵草'))
-      const m = /×(\d+)/.exec(row ?? '')
-      return m ? +m[1] : -1
-    }
-    const invBtn = page.locator('.hud .btn', { hasText: '背包' })
-    for (let i = 0; i < 3; i++) {
-      await invBtn.click()
-      await page.waitForTimeout(600)
-      if (await page.locator('.panel', { hasText: '储物袋' }).isVisible().catch(() => false)) break
-      await page.keyboard.press('Escape')
-      await page.waitForTimeout(400)
-    }
-    const before = await herbCount()
-    await page.locator('.panel', { hasText: '储物袋' }).locator('button', { hasText: '药圃' }).click()
-    await page.waitForTimeout(400)
-    await page.locator('.plot button', { hasText: '播种' }).first().click()
-    await page.waitForTimeout(300)
-    await page.locator('.plot button', { hasText: '催熟' }).first().click()
-    await page.waitForTimeout(300)
-    await page.locator('.plot button', { hasText: '采 收' }).first().click()
-    await page.waitForTimeout(400)
-    await page.locator('.panel', { hasText: '储物袋' }).locator('button', { hasText: '物品' }).first().click()
-    await page.waitForTimeout(400)
-    const after = await herbCount()
-    add('掌天瓶药圃（播种/催熟/采收）', before >= 0 && after >= before + 2, `灵草 ${before} → ${after}`)
-    const close = page.locator('.panel .close').first()
-    if (await close.isVisible().catch(() => false)) {
-      await close.click()
-      await page.waitForTimeout(300)
-    }
   }
 
   // 8. 地图传送（村南 portal (18,27) → 山道）：踏入即触发，检测坐标跃迁与新区域横幅
@@ -374,6 +379,28 @@ try {
     } else {
       add('自动战斗', false, '未遇怪')
     }
+  }
+
+  // 8.8 跨图自动寻路：追踪导航目标在邻图 → 自动走到传送门穿图，抵达目标点
+  {
+    await closeBattle()
+    await page.evaluate(() => window.__xiuxian?.bus.emit('navigate:quest'))
+    let bannerText = ''
+    let near = false
+    let endPos = null
+    for (let i = 0; i < 50; i++) {
+      await page.waitForTimeout(1500)
+      await closeBattle()
+      endPos = await pos()
+      const bt = await page.locator('.area-banner').textContent().catch(() => '')
+      if (bt && bt.length > 0) bannerText = bt
+      if (endPos && Math.abs(endPos.x - 17.5) <= 2 && Math.abs(endPos.y - 14.5) <= 2) {
+        near = true
+        break
+      }
+    }
+    add('跨图自动寻路', near && bannerText.includes('七玄门'),
+      `banner=${bannerText} pos=${endPos?.x},${endPos?.y}`)
   }
 
   // 9. 存档恢复（等自动存档后刷新；若遭遇战斗导致存档跳过则重试一次）

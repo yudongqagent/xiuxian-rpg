@@ -30,10 +30,14 @@ const unQuest = bus.on('quest:updated', () => {
   tracked.value = getTrackedQuest()
   nextHint.value = getNextMainQuestHint()
 })
+const unNames = bus.on('names:ready', () => {
+  nextHint.value = getNextMainQuestHint()
+})
 onUnmounted(() => {
   unPos()
   unStats()
   unQuest()
+  unNames()
 })
 
 const stats = computed(() =>
@@ -66,7 +70,9 @@ function pctOf(v: number, max: number): string {
   </div>
   <button v-if="tracked" class="tracker" @click="bus.emit('navigate:quest')">
     <span class="tname">「{{ tracked.quest.name }}」</span>
-    <span v-if="tracked.readyToTurnIn" class="tdone">目标完成，回去交付吧</span>
+    <span v-if="tracked.readyToTurnIn" class="tdone">
+      {{ tracked.turnInGiver ? `回去找${tracked.turnInGiver}交付` : '目标完成，回去交付吧' }}（点击自动寻路）
+    </span>
     <span v-else>{{ tracked.objectiveLine }}</span>
   </button>
   <button v-else-if="nextHint" class="tracker" @click="$emit('open-quests')">
