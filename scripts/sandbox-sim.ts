@@ -11,6 +11,7 @@ import {
   fromWorldSnapshot,
   seasonName,
   timeLabel,
+  tilesToShichen,
   toWorldSnapshot,
   yearOf,
 } from '../src/systems/time'
@@ -91,6 +92,13 @@ const check = (name: string, ok: boolean, detail = ''): void => {
   check('30日连续模拟无死锁', !deadlock && t.day >= 1, `最终 ${timeLabel(t)}`)
   const restored = fromWorldSnapshot(snap)
   check('模拟过程快照可恢复', restored.day === snap.time.day && restored.shichen === snap.time.shichen, timeLabel(restored))
+}
+
+// 8. V1.1 时间成本：移动/战斗/传送消耗均有锚（纯函数回归）
+{
+  check('行走40格=1时辰', tilesToShichen(40) === 1 && tilesToShichen(120) === 3, String(tilesToShichen(120)))
+  check('不足40格不结算', tilesToShichen(39) === 0, String(tilesToShichen(39)))
+  check('负值钳制为0', tilesToShichen(-5) === 0, String(tilesToShichen(-5)))
 }
 
 console.log(`\nSANDBOX-SIM: ${passed} 项通过, ${failed} 项失败`)

@@ -253,10 +253,14 @@ try {
       `灵 ${qi0} → ${await readQi()} · 打坐=${activeOn} · 保持=${stillOn} · 移动后=${activeOff}`)
   }
 
-  // 7.75 时间轴（V0）：HUD 显示时辰/日/季节，debug 推进后跨日刷新，并随自动存档持久化
+  // 7.75 时间轴（V0/V1.1）：HUD 时钟存在；debug 推 8 时辰后「日」至少 +1；存档恢复后不少于菜单直前
   {
-    const clockNow = () => page.locator('.hud .clock').textContent().catch(() => '')
-    const before = await clockNow()
+    const dayOf = async () => {
+      const t = await page.locator('.hud .clock').textContent().catch(() => '')
+      const m = /第(\d+)日/.exec(t ?? '')
+      return m ? +m[1] : 0
+    }
+    const beforeDay = await dayOf()
     const advanced = await page
       .evaluate(() => {
         if (!window.__xiuxian?.scene?.time) return false
@@ -265,10 +269,9 @@ try {
       })
       .catch(() => false)
     await page.waitForTimeout(600)
-    const after = await clockNow()
-    const day2 = /子时.*?第2日/.test(after) || /第2日/.test(after)
-    add('时间轴推进（HUD 时钟 + 跨日）', advanced && !!before && day2,
-      `${before.trim()} → ${after.trim()}`)
+    const afterDay = await dayOf()
+    add('时间轴推进（HUD 时钟 + 跨日）', advanced && beforeDay > 0 && afterDay > beforeDay,
+      `第${beforeDay}日 → 第${afterDay}日`)
   }
 
   // 8. 地图传送（村南 portal (18,27) → 山道）：踏入即触发，检测坐标跃迁与新区域横幅
@@ -452,9 +455,14 @@ try {
     !!savedPos && !!restoredPos && Math.hypot(savedPos.x - restoredPos.x, savedPos.y - restoredPos.y) <= 4,
     `${savedPos?.x},${savedPos?.y} → ${restoredPos?.x},${restoredPos?.y}`)
 
-  // 9.5 时间轴持久化（V0）：重载后世界时刻仍为「第2日」而非回到开局（证明 world 快照入档）
-  const clock = (await page.locator('.hud .clock').textContent().catch(() => '')).trim()
-  add('时间轴存档保真', /子时.*第2日/.test(clock) || /第2日/.test(clock), `重载后 ${clock}`)
+  // 9.5 时间轴持久化（V0）：重载后世界时刻未回退到开局（证明 world 快照入档）
+  const clockAfterReload = async () => {
+    const t = await page.locator('.hud .clock').textContent().catch(() => '')
+    const m = /第(\d+)日/.exec(t ?? '')
+    return { label: (t ?? '').trim(), day: m ? +m[1] : 0 }
+  }
+  const restoredClock = await clockAfterReload()
+  add('时间轴存档保真', restoredClock.day > 1, `重载后 ${restoredClock.label || '（无时钟）'}`)
 
   add('全程无异常', pageErrors.length === 0, pageErrors.join(' | ').slice(0, 160))
 } finally {

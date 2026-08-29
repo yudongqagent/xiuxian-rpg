@@ -21,10 +21,12 @@ import { enemiesDropping, regionQiDensity, resolveName } from '../systems/conten
 // 2.0 时间轴：世界时刻推进与存档快照（V0.1 / V0.2）
 import {
   REAL_SECONDS_PER_SHICHEN,
+  TILES_PER_SHICHEN,
   advanceWorldTime,
   fromWorldSnapshot,
   getWorldTime,
   setWorldTime,
+  tilesToShichen,
   toWorldSnapshot,
 } from '../systems/time'
 // quest-engine：任务进度恢复与入档
@@ -75,6 +77,9 @@ const MEDITATE_TICK_MS = 2000
 const LOCK_TOAST_COOLDOWN_MS = 1500
 const ENEMY_RESPAWN_MS = 30000
 const WAYPOINT_ARRIVAL_PX = 10
+// ==== 2.0 时间成本（V1.1，REDESIGN §6.1：移动/战斗/传送消耗时辰）====
+const TIME_COST_PORTAL = 2
+const TIME_COST_BATTLE = 1
 const PATH_DIRS: Array<[number, number]> = [
   [0, -1],
   [0, 1],
@@ -123,6 +128,8 @@ export class WorldScene extends Phaser.Scene {
   private battleGraceUntil = 0
   private battleAcked = false
   private knockbackUntil = 0
+  /** 2.0 时间成本：累积移动像素，跨整格结算时辰（V1.1） */
+  private moveTimeAccum = 0
   private meditating = false
   private meditateMult = 1
   private meditateTickNo = 0
@@ -552,6 +559,13 @@ export class WorldScene extends Phaser.Scene {
   }
 
   /** 打坐吐纳：移动/战斗/对话即打断；恢复速率随区域灵气密度放大 */
+  /** 2.0 时间成本：统一结算时辰并广播 HUD（V1.1） */
+  private spendTime(shichen: number): void {
+    if (shichen <= 0) return
+    advanceWorldTime(shichen)
+    bus.emit('time:state', getWorldTime())
+  }
+
   private toggleMeditate(): void {
     if (this.meditating) {
       this.stopMeditate()
@@ -777,6 +791,8 @@ export class WorldScene extends Phaser.Scene {
     this.autoPath = []
     this.player!.setVelocity(0, 0)
     this.joyVec = { x: 0, y: 0 }
+    // 2.0 时间成本：跨图传送消耗 2 时辰（远行消耗，V1.1）
+    this.spendTime(TIME_COST_PORTAL)
     this.cameras.main.fadeOut(FADE_MS, 0, 0, 0)
     this.cameras.main.once('camerafadeoutcomplete', () =>
       this.scene.restart({ mapId: to.map, x: to.x, y: to.y }),
@@ -825,6 +841,8 @@ export class WorldScene extends Phaser.Scene {
       }),
       bus.on('battle:end', ({ win, fled }) => {
         this.battleActive = false
+        // 2.0 时间成本：一场战斗消耗 1 时辰（V1.1）
+        this.spendTime(TIME_COST_BATTLE)
         // 战斗结束后短暂免遭遇窗口，防止贴身妖兽瞬间再开战
         this.battleGraceUntil = this.time.now + 2200
         if (win) {
@@ -918,6 +936,16 @@ export class WorldScene extends Phaser.Scene {
 
     // ==== rich-graphics：行走动画与尘土 ====
     const moving = Math.abs(this.player.body.velocity.x) + Math.abs(this.player.body.velocity.y) > 4
+    // ==== 2.0 时间成本：行走逐帧累积像素，满整格（TILE）结算时辰（V1.1）
+    if (moving) {
+      const speed = Math.hypot(this.player.body.velocity.x, this.player.body.velocity.y)
+      this.moveTimeAccum += speed * (this.game.loop.delta / 1000)
+      const cost = tilesToShichen(this.moveTimeAccum / TILE)
+      if (cost > 0) {
+        this.moveTimeAccum -= cost * TILES_PER_SHICHEN * TILE
+        this.spendTime(cost)
+      }
+    }
     this.heroDust?.setMoving(moving)
     if (moving) {
       const dir =

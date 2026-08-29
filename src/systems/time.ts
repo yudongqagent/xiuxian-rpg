@@ -8,6 +8,8 @@
 export const SHICHEN_PER_DAY = 8
 /** 现实 60 秒 ≈ 游戏内一个时辰（REDESIGN：一个时辰约现实 1 分钟） */
 export const REAL_SECONDS_PER_SHICHEN = 60
+/** 移动成本锚点：行走 40 格 ≈ 1 时辰（地图穿行级时间成本，REDESIGN §6.1） */
+export const TILES_PER_SHICHEN = 40
 export const DAYS_PER_SEASON = 15
 export const SEASONS = ['春', '夏', '秋', '冬'] as const
 /** 游戏内时辰显示名（取传统十二时辰之八，覆盖昼夜） */
@@ -61,6 +63,11 @@ export function yearOf(t: WorldTimeData): number {
 
 export function timeLabel(t: WorldTimeData): string {
   return `${shichenName(t)}时 · 第${t.day}日 · ${seasonName(t)} · 第${yearOf(t)}年`
+}
+
+/** 移动时间成本：行走 n 格折算时辰数（锚 TILES_PER_SHICHEN，纯函数便于 G3b 回归） */
+export function tilesToShichen(tiles: number): number {
+  return Math.max(0, Math.floor(tiles / TILES_PER_SHICHEN))
 }
 
 export function toWorldSnapshot(t: WorldTimeData): WorldSnapshot {
