@@ -1,5 +1,6 @@
 import type { JoystickVector } from './joystickTypes'
 import type { QuestSaveData, QuestStatus } from '../systems/quests'
+import type { WorldTimeData } from '../systems/time'
 
 type GameEvents = {
   /** 摇杆输入向量，长度 0~1 */
@@ -50,6 +51,8 @@ type GameEvents = {
   'navigate:tile': { x: number; y: number }
   /** 内容名称表懒加载完成（HUD 由此刷新「下一步」等含名称的派生文案） */
   'names:ready': void
+  /** 2.0 时间轴：世界时刻变化（时辰/日/季节/年推进时广播，HUD 时钟刷新） */
+  'time:state': WorldTimeData
   /** 小地图数据：进入地图时发一次全量快照（图块行 + 静态点位，图块坐标） */
   'map:minimap': {
     rows: string[]

@@ -18,6 +18,15 @@ import {
   updatePlayer,
 } from '../systems/player'
 import { enemiesDropping, regionQiDensity, resolveName } from '../systems/contentNames'
+// 2.0 时间轴：世界时刻推进与存档快照（V0.1 / V0.2）
+import {
+  REAL_SECONDS_PER_SHICHEN,
+  advanceWorldTime,
+  fromWorldSnapshot,
+  getWorldTime,
+  setWorldTime,
+  toWorldSnapshot,
+} from '../systems/time'
 // quest-engine：任务进度恢复与入档
 import {
   getTrackedTarget,
@@ -249,6 +258,25 @@ export class WorldScene extends Phaser.Scene {
     bus.emit('player:stats')
     // quest-engine：恢复任务进度
     restoreQuests(save?.quests)
+    // 2.0 时间轴：恢复世界时刻（旧档缺省按开局第一天）
+    setWorldTime(fromWorldSnapshot(save?.world))
+
+    // 2.0 时间轴：真实时间驱动世界时刻（1 时辰 ≈ 60s 现实），期间事件队列至 V2
+    let clockMs = 0
+    this.time.addEvent({
+      delay: 1000,
+      loop: true,
+      callback: () => {
+        if (this.battleActive || this.transitioning) return
+        clockMs += 1000
+        if (clockMs >= REAL_SECONDS_PER_SHICHEN * 1000) {
+          const n = Math.floor(clockMs / (REAL_SECONDS_PER_SHICHEN * 1000))
+          clockMs -= n * REAL_SECONDS_PER_SHICHEN * 1000
+          advanceWorldTime(n)
+          bus.emit('time:state', getWorldTime())
+        }
+      },
+    })
 
     this.time.addEvent({
       delay: 5000,
@@ -283,6 +311,13 @@ export class WorldScene extends Phaser.Scene {
         })),
       garden: () => getPlayer().garden,
       navDirect: (tx: number, ty: number) => this.startAutoPathTo(tx, ty),
+      time: {
+        get: () => getWorldTime(),
+        advance: (shichen: number) => {
+          advanceWorldTime(shichen)
+          bus.emit('time:state', getWorldTime())
+        },
+      },
       flags: () => ({
         dialogueOpen: this.dialogueOpen,
         battleActive: this.battleActive,
@@ -930,6 +965,7 @@ export class WorldScene extends Phaser.Scene {
       savedAt: Date.now(),
       player: toPlayerSave(getPlayer()),
       quests: snapshotQuests(),
+      world: toWorldSnapshot(getWorldTime()),
     }
   }
 
@@ -943,6 +979,7 @@ export class WorldScene extends Phaser.Scene {
     await writeSave(data, AUTO_SLOT)
     setPlayer(fromPlayerSave(data.player))
     restoreQuests(data.quests)
+    setWorldTime(fromWorldSnapshot(data.world))
     bus.emit('player:stats')
     this.transitioning = true
     this.cameras.main.fadeOut(FADE_MS, 0, 0, 0)

@@ -15,6 +15,7 @@ declare global {
         garden: () => unknown
         navDirect: (tx: number, ty: number) => void
         flags: () => { dialogueOpen: boolean; battleActive: boolean; transitioning: boolean }
+        time: { get: () => unknown; advance: (shichen: number) => void }
       }
     }
   }

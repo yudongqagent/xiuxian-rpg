@@ -11,6 +11,7 @@ import {
 } from '../systems/player'
 import { ITEMS } from '../systems/itemBook'
 import { getTrackedQuest, getNextMainQuestHint, type TrackedQuestView } from '../systems/questRuntime'
+import { getWorldTime, timeLabel, subscribeWorldTime, type WorldTimeData } from '../systems/time'
 
 defineEmits<{ 'open-inventory': []; 'open-quests': []; 'open-saves': []; 'open-map': []; 'open-breakthrough': [] }>()
 const muted = ref(localStorage.getItem('xj-muted') === '1')
@@ -25,6 +26,8 @@ const player = ref(getPlayer())
 const unPos = bus.on('player:position', (p) => (pos.value = p))
 const unStats = subscribePlayer(() => (player.value = getPlayer()))
 const tracked = ref<TrackedQuestView | null>(getTrackedQuest())
+const worldTime = ref<WorldTimeData>(getWorldTime())
+const unTime = subscribeWorldTime(() => (worldTime.value = getWorldTime()))
 const nextHint = ref(getNextMainQuestHint())
 const unQuest = bus.on('quest:updated', () => {
   tracked.value = getTrackedQuest()
@@ -38,6 +41,7 @@ onUnmounted(() => {
   unStats()
   unQuest()
   unNames()
+  unTime()
 })
 
 const stats = computed(() =>
@@ -58,7 +62,7 @@ function pctOf(v: number, max: number): string {
       <span class="name">凡人 · {{ realmLabel(player.level) }}</span>
       <div class="bar"><i class="exp" :style="{ width: pctOf(player.exp, expToNext(player.level)) }" /></div>
       <span class="hint">血 {{ player.hp }}/{{ stats.maxHp }} · 灵 {{ player.qi }}/{{ stats.maxQi }} · 攻 {{ stats.atk }} 防 {{ stats.def }} · 灵石 {{ player.lingshi }} · 修为
-        {{ player.exp }}/{{ expToNext(player.level) }}</span>
+        {{ player.exp }}/{{ expToNext(player.level) }} · <span class="clock">{{ timeLabel(worldTime) }}</span></span>
     </div>
     <button class="btn" @click="$emit('open-map')">地图</button>
     <button class="btn" @click="$emit('open-saves')">存档</button>
@@ -160,6 +164,9 @@ function pctOf(v: number, max: number): string {
 }
 .tname {
   color: #ffd97a;
+}
+.clock {
+  color: #9fd0e8;
 }
 .tdone {
   color: #9fe0a9;

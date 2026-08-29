@@ -10,6 +10,7 @@
     "validate": "tsx scripts/validate.ts",
     "check:combat": "tsx scripts/combat-check.ts",
     "check:quest": "tsx scripts/quest-check.ts",
+    "check:sandbox": "tsx scripts/sandbox-sim.ts",
     "qa:local": "node scripts/qa-local.mjs",
     "pack:itch": "tsx scripts/pack-itch.ts"
   },

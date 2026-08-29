@@ -1,5 +1,6 @@
 /** 存档系统：IndexedDB。auto 自动档 + s1/s2/s3 手动档（ENG-5）。 */
 import type { QuestSaveData } from '../systems/quests'
+import type { WorldSnapshot } from '../systems/time'
 
 const DB_NAME = 'xiuxian-save'
 const STORE = 'slots'
@@ -49,6 +50,8 @@ export interface SaveData {
   player?: PlayerSave
   /** quest-engine 新增：任务进度（additive 可选，旧存档无此字段） */
   quests?: QuestSaveData
+  /** 2.0 时间轴：世界快照（additive 可选，旧存档无此字段） */
+  world?: WorldSnapshot
 }
 
 export async function loadSave(slot: SlotId = AUTO_SLOT): Promise<SaveData | null> {
