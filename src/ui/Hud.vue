@@ -12,6 +12,7 @@ import {
 import { ITEMS } from '../systems/itemBook'
 import { getTrackedQuest, getNextMainQuestHint, type TrackedQuestView } from '../systems/questRuntime'
 import { getWorldTime, timeLabel, subscribeWorldTime, type WorldTimeData } from '../systems/time'
+import { lifespanAt, remainingYears } from '../systems/lifespan'
 
 defineEmits<{ 'open-inventory': []; 'open-quests': []; 'open-saves': []; 'open-map': []; 'open-breakthrough': [] }>()
 const muted = ref(localStorage.getItem('xj-muted') === '1')
@@ -50,6 +51,11 @@ const stats = computed(() =>
 const gateReady = computed(
   () => Boolean(gateAt(player.value.level)) && player.value.exp >= expToNext(player.value.level),
 )
+// 2.0 寿元（V1.5）：常驻倒计时 —— 世界历驱动，玩家岁数随世界日推进（60 日 = 一载），只减不增
+const remaining = computed(() => remainingYears(player.value.level, worldTime.value.day))
+const lifespanTotal = computed(() => lifespanAt(player.value.level))
+const lifeWarn = computed(() => remaining.value < lifespanTotal.value / 2)
+const lifeLow = computed(() => remaining.value <= 30)
 
 function pctOf(v: number, max: number): string {
   return `${Math.min(100, Math.round((v / max) * 100))}%`
@@ -60,6 +66,9 @@ function pctOf(v: number, max: number): string {
   <div class="hud">
     <div class="realm">
       <span class="name">凡人 · {{ realmLabel(player.level) }}</span>
+      <span :class="['yrs', { warn: lifeWarn, low: lifeLow }]" role="timer">
+        寿余 {{ remaining }}/{{ lifespanTotal }} 载
+      </span>
       <div class="bar"><i class="exp" :style="{ width: pctOf(player.exp, expToNext(player.level)) }" /></div>
       <span class="hint">血 {{ player.hp }}/{{ stats.maxHp }} · 灵 {{ player.qi }}/{{ stats.maxQi }} · 攻 {{ stats.atk }} 防 {{ stats.def }} · 灵石 {{ player.lingshi }} · 修为
         {{ player.exp }}/{{ expToNext(player.level) }} · <span class="clock">{{ timeLabel(worldTime) }}</span></span>
@@ -167,6 +176,29 @@ function pctOf(v: number, max: number): string {
 }
 .clock {
   color: #9fd0e8;
+}
+.yrs {
+  margin-left: 8px;
+  font-family: var(--font-display);
+  color: #9fe0a9;
+  letter-spacing: 1px;
+}
+.yrs.warn {
+  color: #ffd97a;
+  animation: yrs-pulse 1.6s ease-in-out infinite;
+}
+.yrs.low {
+  color: #e88a7a;
+  animation: yrs-pulse 0.8s ease-in-out infinite;
+}
+@keyframes yrs-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
 }
 .tdone {
   color: #9fe0a9;

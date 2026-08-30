@@ -16,6 +16,7 @@ import ShopPanel from './ui/ShopPanel.vue'
 import QuestToast from './ui/QuestToast.vue'
 import TitleSplash from './ui/TitleSplash.vue'
 import BattleTransition from './ui/BattleTransition.vue'
+import EndingPanel from './ui/EndingPanel.vue'
 import { bindAudioEvents, initAudio } from './systems/audio'
 import { initQuestRuntime } from './systems/questRuntime'
 import { bus } from './engine/eventBus'
@@ -106,6 +107,7 @@ onUnmounted(() => {
     <AreaBanner />
     <QuestToast />
     <BattleTransition />
+    <EndingPanel />
     <TitleSplash @start="startGame" />
   </div>
 </template>

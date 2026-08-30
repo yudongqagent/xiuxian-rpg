@@ -57,6 +57,12 @@ function toggle(): void {
   bus.emit('meditate:toggle')
 }
 
+// 2.0 寿元（V1.5）：闭关参悟一键跳过等待——快进一年岁月（= 消耗 1 载寿元），结算闭关修为
+function seclude(): void {
+  chime(523, 0.16)
+  bus.emit('meditate:seclude')
+}
+
 onUnmounted(() => {
   unState()
   unTick()
@@ -71,6 +77,9 @@ onUnmounted(() => {
     <button class="fab" :class="{ on: active }" :aria-pressed="active" @click="toggle">
       <span class="label">{{ active ? '吐纳中' : '打坐' }}</span>
       <span v-if="active" class="mult">灵气 ×{{ mult }}</span>
+    </button>
+    <button class="seclude" :title="'闭关一载：快进一年岁月（消耗 1 载寿元）参悟修为'" @click="seclude">
+      闭关
     </button>
   </div>
 </template>
@@ -122,6 +131,25 @@ onUnmounted(() => {
   font-size: 9px;
   opacity: 0.75;
   letter-spacing: 0;
+}
+.seclude {
+  pointer-events: auto;
+  position: absolute;
+  left: -58px;
+  bottom: 8px;
+  width: 52px;
+  height: 48px;
+  border-radius: 8px;
+  border: 1px solid #8b6914;
+  background: rgba(26, 18, 11, 0.82);
+  color: #e8dcc0;
+  font-size: 13px;
+  letter-spacing: 0.2em;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+.seclude:active {
+  border-color: #ffd97a;
+  color: #ffd97a;
 }
 .floater {
   position: absolute;

@@ -53,6 +53,12 @@ type GameEvents = {
   'names:ready': void
   /** 2.0 时间轴：世界时刻变化（时辰/日/季节/年推进时广播，HUD 时钟刷新） */
   'time:state': WorldTimeData
+  /** 寿元（V1.5）：闭关参悟一键跳过等待（世界层快进岁月并结算修为） */
+  'meditate:seclude': void
+  /** 寿元（V1.5）：突破失败且剩余不足半寿 → 该大境界此世无望（世界层入档硬锁） */
+  'aging:lock': { realm: string }
+  /** 寿元（V1.5）：寿元耗尽即此世终结（结局，世界层冻结世界时钟） */
+  'aging:end': void
   /** 小地图数据：进入地图时发一次全量快照（图块行 + 静态点位，图块坐标） */
   'map:minimap': {
     rows: string[]

@@ -27,8 +27,11 @@ declare global {
           labor: { lastWorkDay?: number }
           reputation: number
           absentDays: number
+          aging: { lockedRealms: string[]; ended: boolean }
           _now: unknown
         }
+        'rng.force': (v: number | null) => void
+        'realm.set': (level: number) => void
         flags: () => { dialogueOpen: boolean; battleActive: boolean; transitioning: boolean }
         time: { get: () => unknown; advance: (shichen: number) => void; set: (day: number, shichen: number) => void }
       }

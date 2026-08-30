@@ -34,6 +34,32 @@ import {
   buyPriceFactor,
   setReputation,
 } from '../src/systems/worldEvents'
+import {
+  addItem,
+  attemptBreakthrough,
+  expToNext,
+  fromPlayerSave,
+  gateAt,
+  grantExp,
+  setRngOverride,
+  statsForLevel,
+} from '../src/systems/player'
+import {
+  INIT_AGE,
+  ageOf,
+  createAgingState,
+  cultivateMonths,
+  getAging,
+  hopelessRemaining,
+  isRealmLocked,
+  lifespanAt,
+  lifespanExhausted,
+  lockRealm,
+  markEnded,
+  remainingYears,
+  setAging,
+  subscribeAging,
+} from '../src/systems/lifespan'
 
 let passed = 0
 let failed = 0
@@ -219,6 +245,59 @@ const check = (name: string, ok: boolean, detail = ''): void => {
 }
 // 清理：避免把测试注入的有副作用风评带进后续断言
 setReputation(0)
+
+// 14. V1.5 寿元推进（世界历驱动）：境界→寿元表 / 年龄 / 剩余年限 / 无望判定（纯函数回归）
+{
+  check('出身 22 岁', ageOf(1) === INIT_AGE && INIT_AGE === 22, `age=${ageOf(1)}`)
+  check('60 游戏日 = 1 岁', ageOf(61) === 23 && ageOf(3661) === 83, `age(3661)=${ageOf(3661)}`)
+  check('第 83 载炼气余 37 年（验收锚）', remainingYears(13, 3661) === 37, `remaining=${remainingYears(13, 3661)}`)
+  check('境界寿元表（炼气/筑基/化神）', lifespanAt(1) === 120 && lifespanAt(14) === 200 && lifespanAt(25) === 1500, `120/200/1500`)
+  check('剩余不足半寿 → 破境无望（37年）', hopelessRemaining(13, 3661) === true, `hopeless=${hopelessRemaining(13, 3661)}`)
+  check('余寿充足不判无望（82年）', hopelessRemaining(13, 991) === false, `hopeless=${hopelessRemaining(13, 991)}`)
+  check('寿元耗尽才终结', lifespanExhausted(1, 5881) === true && lifespanExhausted(1, 5880) === false, `ex(${lifespanExhausted(1, 5881)})`)
+  check('负日/开局不超出身', ageOf(0) === 22 && remainingYears(1, 1) === lifespanAt(1) - INIT_AGE, `age(0)=${ageOf(0)}`)
+}
+
+// 15. V1.5 闭关参悟 + 突破 RNG 覆写（纯函数回归）：闭关修为遵守圆满门限；突破可确定性回归
+{
+  const mkGatePlayer = () => {
+    const base = grantExp(fromPlayerSave(undefined), 99999).player
+    const s = statsForLevel(13)
+    return addItem({ ...base, hp: s.maxHp, qi: s.maxQi, exp: expToNext(13) }, 'zhu_ji_dan')
+  }
+  const med = cultivateMonths(fromPlayerSave(undefined), 12, 1)
+  check('闭关一载修为 +48', med.expGain === 48, `expGain=${med.expGain}`)
+  const gated = cultivateMonths(mkGatePlayer(), 1200, 1)
+  check('闭关冲破门限时修为封顶（不越境界）', gated.player.level === 13 && gated.player.exp === expToNext(13), `L${gated.player.level} exp=${gated.player.exp}`)
+
+  setRngOverride(() => 0.99)
+  const fail = attemptBreakthrough(mkGatePlayer(), gateAt(13)!, undefined)
+  check('强制失败：耗丹重伤不堕落', fail.success === false && fail.player.level === 13 && !(fail.player.inventory.zhu_ji_dan > 0), `level=${fail.player.level}`)
+  setRngOverride(() => 0)
+  const win = attemptBreakthrough(mkGatePlayer(), gateAt(13)!, undefined)
+  check('强制成功：晋升筑基一层', win.success === true && win.player.level === 14, `level=${win.player.level}`)
+  setRngOverride(null)
+  const free = attemptBreakthrough(mkGatePlayer(), gateAt(13)!, undefined)
+  check('RNG 覆写复位（随机回归）', typeof free.success === 'boolean' && free.chance >= 0 && free.chance <= 0.95, `chance=${free.chance}`)
+}
+
+// 16. V1.5 aging 存储：硬锁/终结写回 + 订阅（同风评存储做法）
+{
+  const s = createAgingState()
+  check('初始无锁未终结', s.lockedRealms.length === 0 && s.ended === false, JSON.stringify(s))
+  const locked = lockRealm(s, '筑基')
+  check('硬锁筑基', isRealmLocked(locked, '筑基') === true && isRealmLocked(locked, '结丹') === false, JSON.stringify(locked.lockedRealms))
+  check('重复锁定不重复记录', lockRealm(locked, '筑基').lockedRealms.length === 1, JSON.stringify(locked.lockedRealms))
+  check('终结标记幂等', markEnded(markEnded(s)).ended === true, 'idempotent')
+  let fired = 0
+  const unsub = subscribeAging(() => fired++)
+  setAging(locked)
+  setAging(markEnded(locked))
+  unsub()
+  check('aging 存储写入/订阅/读回', fired === 2 && isRealmLocked(getAging(), '筑基') && getAging().ended, `fired=${fired} state=${JSON.stringify(getAging())}`)
+  setAging(createAgingState())
+  check('aging 复位', getAging().lockedRealms.length === 0 && getAging().ended === false, JSON.stringify(getAging()))
+}
 
 console.log(`\nSANDBOX-SIM: ${passed} 项通过, ${failed} 项失败`)
 process.exit(failed === 0 ? 0 : 1)

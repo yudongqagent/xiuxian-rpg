@@ -19,15 +19,19 @@ import { FRAME, HOUSE_KEY, MAP_ATLAS_KEY, GATHER_KEYS, GATHER_TINTS, GATHER_TINT
 // combat-depth：成长/背包状态恢复与战败惩罚
 import {
   addItem,
+  effectiveStats,
+  expToNext,
   fromPlayerSave,
   getPlayer,
   meditateTick,
   respawnPenalty,
   setPlayer,
+  setRngOverride,
   toPlayerSave,
   updatePlayer,
 } from '../systems/player'
 import { enemiesDropping, npcScheduleFor, npcWatchRadiusFor, regionQiDensity, resolveName } from '../systems/contentNames'
+import { ITEMS } from '../systems/itemBook'
 // 2.0 关系图雏形：好感/记恨写回 + 日程查表（V1.3）
 import {
   GRUDGE_PER_THEFT,
@@ -47,9 +51,20 @@ import {
 } from '../systems/worldEvents'
 // 2.0 事件风暴首例（V1.4）：Vite glob 注册事件表（仅浏览器侧）
 import { loadWorldEvents } from '../systems/worldEventLoader'
+// 2.0 寿元（V1.5）：世界历驱动推进 + 大境界硬锁/此世终结 + 闭关参悟修为
+import {
+  cultivateMonths,
+  getAging,
+  lifespanExhausted,
+  lockRealm,
+  markEnded,
+  setAging,
+} from '../systems/lifespan'
 // 2.0 时间轴：世界时刻推进与存档快照（V0.1 / V0.2）
 import {
+  DAYS_PER_YEAR,
   REAL_SECONDS_PER_SHICHEN,
+  SHICHEN_PER_DAY,
   TILES_PER_SHICHEN,
   advanceWorldTime,
   fromWorldSnapshot,
@@ -57,6 +72,7 @@ import {
   setWorldTime,
   tilesToShichen,
   toWorldSnapshot,
+  yearOf,
 } from '../systems/time'
 // quest-engine：任务进度恢复与入档
 import {
@@ -321,6 +337,12 @@ export class WorldScene extends Phaser.Scene {
     this.firedEvents = new Set(save?.world?.events ?? [])
     this.labor = { lastWorkDay: save?.world?.labor?.lastWorkDay }
     setReputation(save?.world?.reputation ?? 0)
+    // 2.0 寿元（V1.5）：恢复大境界硬锁/此世终结（寿元推进由世界历驱动，存日即可推算年龄）
+    setAging({
+      lockedRealms: save?.world?.aging?.lockedRealms ?? [],
+      ended: save?.world?.aging?.ended ?? false,
+    })
+    if (getAging().ended) bus.emit('aging:end')
 
     // 2.0 时间轴：真实时间驱动世界时刻（1 时辰 ≈ 60s 现实），期间事件队列至 V2
     let clockMs = 0
@@ -328,7 +350,7 @@ export class WorldScene extends Phaser.Scene {
       delay: 1000,
       loop: true,
       callback: () => {
-        if (this.battleActive || this.transitioning) return
+        if (this.battleActive || this.transitioning || getAging().ended) return
         clockMs += 1000
         if (clockMs >= REAL_SECONDS_PER_SHICHEN * 1000) {
           const n = Math.floor(clockMs / (REAL_SECONDS_PER_SHICHEN * 1000))
@@ -396,8 +418,25 @@ export class WorldScene extends Phaser.Scene {
           labor: { ...this.labor },
           reputation: getReputation(),
           absentDays: absentWorkDays(this.labor.lastWorkDay, getWorldTime().day),
+          aging: getAging(),
           _now: getWorldTime(),
         }),
+      // 2.0 寿元（V1.5）：qa-local 确定性回归 —— 强制突破随机结果 / 快进到指定境界门
+      'rng.force': (v: number | null) => setRngOverride(v === null ? null : () => v),
+      'realm.set': (level: number) => {
+        const p = getPlayer()
+        const s = effectiveStats(level, p.equipped, (id) => ITEMS[id])
+        const at = expToNext(level)
+        updatePlayer((cur) => ({
+          ...cur,
+          level,
+          exp: at,
+          hp: s.maxHp,
+          qi: s.maxQi,
+          inventory: { ...cur.inventory, zhu_ji_dan: (cur.inventory.zhu_ji_dan ?? 0) + 1 },
+        }))
+        bus.emit('player:stats')
+      },
       time: {
         get: () => getWorldTime(),
         advance: (shichen: number) => {
@@ -953,6 +992,15 @@ export class WorldScene extends Phaser.Scene {
         this.repositionScheduledNpcs()
         // 2.0 事件风暴首例（V1.4）：世界时刻推进即评估事件条件（once 防重复）
         this.runEventTicks()
+        // 2.0 寿元（V1.5）：世界时刻推进即检查寿元耗尽之终局
+        this.checkLifespan()
+      }),
+      // 2.0 寿元（V1.5）：打坐参悟需漫长岁月，闭关一键跳过等待（快进岁月 = 消耗寿元）
+      bus.on('meditate:seclude', () => this.secludeOneYear()),
+      // 2.0 寿元（V1.5）：突破失败且剩余不足半寿 → 该大境界此世无望（立即入档）
+      bus.on('aging:lock', ({ realm }) => {
+        setAging(lockRealm(getAging(), realm))
+        void writeSave(this.snapshotSave(), AUTO_SLOT)
       }),
       bus.on('navigate:quest', () => this.navigateToObjective()),
       bus.on('navigate:tile', ({ x, y }) => {
@@ -1186,6 +1234,38 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
+  /** 2.0 寿元（V1.5）：寿元耗尽即此世终结（多结局之一）。世界时钟将被冻结，结局面板出场 */
+  private checkLifespan(): void {
+    if (getAging().ended) return
+    if (this.transitioning || this.battleActive) return
+    if (!lifespanExhausted(getPlayer().level, getWorldTime().day)) return
+    setAging(markEnded(getAging()))
+    bus.emit('aging:end')
+    void writeSave(this.snapshotSave(), AUTO_SLOT)
+  }
+
+  /** 2.0 寿元（V1.5）：闭关一载（一键跳过漫长参悟等待）——快进一年岁月，按灵气密度结算闭关修为 */
+  private secludeOneYear(): void {
+    if (this.transitioning || this.battleActive || this.dialogueOpen || getAging().ended) return
+    const mult = regionQiDensity(this.gameMap.regionId)
+    let gained = 0
+    updatePlayer((p) => {
+      const r = cultivateMonths(p, 12, mult)
+      gained = r.expGain
+      return r.player
+    })
+    // 岁月流逝即寿元消耗：打坐参悟所需限界完全照世界历演进（跳过等待 = 快进寿元）
+    this.spendTime(DAYS_PER_YEAR * SHICHEN_PER_DAY)
+    this.stopMeditate()
+    bus.emit('meditate:tick', { hp: 0, qi: 0, exp: gained, mult })
+    bus.emit('quest:notify', {
+      text: `闭关一载（${yearOf(getWorldTime())}年）· 参悟所得修为 ${gained}，寿元消耗 1 载`,
+      kind: 'success',
+    })
+    this.checkLifespan()
+    void writeSave(this.snapshotSave(), AUTO_SLOT)
+  }
+
   /** 2.0 采集动作（V1.2）：消耗时辰 + 产出物入包 + 标记再生周期 */
   private tryGather(): void {
     if (this.transitioning || this.battleActive || this.dialogueOpen) return
@@ -1255,6 +1335,8 @@ export class WorldScene extends Phaser.Scene {
         events: [...this.firedEvents],
         labor: { lastWorkDay: this.labor.lastWorkDay },
         reputation: getReputation(),
+        // 2.0 寿元（V1.5）：大境界硬锁/此世终结随世界快照入档（推进由世界历驱动，无需存年龄）
+        aging: getAging(),
       },
     }
   }

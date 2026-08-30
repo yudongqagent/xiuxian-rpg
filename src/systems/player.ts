@@ -241,12 +241,18 @@ export interface BreakthroughResult {
   reason?: 'not_gate' | 'exp_not_full' | 'qi_not_full' | 'no_pill'
 }
 
+/** 突破前强制随机数（供 qa-local 确定性回归；null 即恢复 Math.random） */
+let rngOverride: (() => number) | null = null
+export function setRngOverride(rng: (() => number) | null): void {
+  rngOverride = rng
+}
+
 /** 大境界突破仪式（GDD §2.1）：条件=修为圆满+灵气圆满+丹药；失败耗丹重伤，绝不降境界删档 */
 export function attemptBreakthrough(
   p: PlayerState,
   gate: GateInfo,
   regionId: string | undefined,
-  rng: () => number = Math.random,
+  rng: () => number = () => (rngOverride ? rngOverride() : Math.random()),
 ): BreakthroughResult {
   const s = statsForLevel(p.level)
   if (p.level !== gate.fromLevel) return { player: p, success: false, chance: 0, reason: 'not_gate' }

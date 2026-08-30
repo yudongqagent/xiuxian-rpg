@@ -545,6 +545,83 @@ try {
       `Δ灵石=${delta} rep=${fires?.reputation}`)
   }
 
+  // 8.93 寿元（V1.5）：突破失败且剩余寿元不足半寿 → 「寿元剩余 37 年无望筑基」+ 大境界硬锁
+  {
+    await closeBattle()
+    // 快进到炼气十三门 + 遥送到第 83 载（剩余 120-83=37 年），再强制突破失败
+    await page.evaluate(() => window.__xiuxian?.scene['realm.set']?.(13))
+    await page.evaluate(() => window.__xiuxian?.scene.time.set(3661, 0))
+    await page.evaluate(() => window.__xiuxian?.scene['rng.force']?.(0.99))
+    await page.waitForTimeout(300)
+    const gateBtn = page.locator('.hud .btn.gate')
+    const gateOk = await gateBtn.isVisible().catch(() => false)
+    if (gateOk) await gateBtn.click()
+    await page.waitForTimeout(400)
+    const lifespanLine = await page.locator('.hud .yrs').textContent().catch(() => '')
+    const m = /寿余 (\d+)\/(\d+) 载/.exec(lifespanLine ?? '')
+    const remaining = m ? +m[1] : -1
+    const go = page.locator('.overlay .go')
+    if (await go.isVisible().catch(() => false)) await go.click()
+    await page.waitForTimeout(500)
+    const dreadful = await page.locator('.dreadful').textContent().catch(() => '')
+    const dreadOk = /寿元剩余 37 年/.test(dreadful ?? '') && /无望筑基/.test(dreadful ?? '')
+    const toastDread = await page.locator('.toast', { hasText: /寿元剩余 37 年/ }).first().isVisible().catch(() => false)
+    const locked = await page.evaluate(() => (window.__xiuxian?.scene.world?.()?.aging?.lockedRealms ?? []).includes('筑基'))
+    add('「寿元剩余 37 年无望筑基」展示', gateOk && remaining === 37 && dreadOk && toastDread && locked,
+      `寿余=${remaining} dreadful=${(dreadful ?? '').trim().slice(0, 40)} locked=${locked}`)
+
+    // 硬锁后再次冲关被阻
+    await page.locator('.overlay .close').click().catch(() => {})
+    await page.waitForTimeout(300)
+    const reopen = page.locator('.hud .btn.gate')
+    const reopenOk = await reopen.isVisible().catch(() => false)
+    if (reopenOk) await reopen.click()
+    await page.waitForTimeout(300)
+    const lockedReason = await page.locator('.overlay .reason').textContent().catch(() => '')
+    const noGo = await page.locator('.overlay .go').isDisabled().catch(() => false)
+    const lockedGateName = await page.locator('.overlay .go').textContent().catch(() => '')
+    add('大境界硬锁：此世无缘筑基', reopenOk && /此世无缘筑基/.test(lockedReason ?? '') && noGo && /天命已绝/.test(lockedGateName ?? ''),
+      `reason=${(lockedReason ?? '').trim().slice(0, 30)} go=${(lockedGateName ?? '').trim()} disabled=${noGo}`)
+    await page.locator('.overlay .close').click().catch(() => {})
+    await page.waitForTimeout(300)
+  }
+
+  // 8.95 寿元（V1.5）：闭关参悟一键跳过等待——快进一载岁月（寿元消耗 1），按灵气密度结算修为
+  {
+    const before = await page.evaluate(() => {
+      const w = window.__xiuxian?.scene.world?.()
+      return { day: w?._now?.day, locked: w?.aging?.lockedRealms ?? [] }
+    })
+    const seclude = page.locator('.meditate-wrap .seclude')
+    if (await seclude.isVisible().catch(() => false)) await seclude.click()
+    await page.waitForTimeout(600)
+    const after = await page.evaluate(() => window.__xiuxian?.scene.time.get?.())
+    const secludeToast = await page.locator('.toast', { hasText: /闭关一载/ }).first().isVisible().catch(() => false)
+    const expMatched = await page.locator('.toast', { hasText: /参悟所得修为 \d+/ }).first().isVisible().catch(() => false)
+    const yrsAfter = await page.locator('.hud .yrs').textContent().catch(() => '')
+    const yrsOk = /寿余 (35|36)\/120/.test(yrsAfter ?? '')
+    add('闭关一载跳过等待（+60 日 · 寿元耗 1 载 · 结算修为）',
+      (before?.day ?? 0) > 0 && after?.day === (before?.day ?? 0) + 60 && secludeToast && expMatched && yrsOk,
+      `day ${before?.day}→${after?.day} · 寿余 ${(yrsAfter ?? '').trim()} · toast=${secludeToast}`)
+  }
+
+  // 8.94 寿元（V1.5）：寿元耗尽即此世终结（结局·寿数尽）——世界时钟冻结，终局可入档
+  {
+    await closeBattle()
+    // 炼气 120 载寿尽：第 5881 日 = 第 98 载（22+98=120 岁，剩余 0）
+    await page.evaluate(() => window.__xiuxian?.scene.time.set(5881, 0))
+    await page.waitForTimeout(500)
+    const endingVisible = await page.locator('.ending').isVisible().catch(() => false)
+    const title = await page.locator('.ending .title').textContent().catch(() => '')
+    const meta = await page.locator('.ending .meta').textContent().catch(() => '')
+    const ended = await page.evaluate(() => window.__xiuxian?.scene.world?.()?.aging?.ended === true)
+    add('寿元耗尽 → 终局「寿尽而终」', endingVisible && /寿尽而终/.test(title ?? '') && /享年 120 岁/.test(meta ?? '') && ended,
+      `title=${(title ?? '').trim()} meta=${(meta ?? '').trim().slice(0, 40)} ended=${ended}`)
+    await page.locator('.ending .go').click().catch(() => {})
+    const closed = await page.locator('.ending').isHidden().catch(() => true)
+    add('终局可闭（游历定格之世）', closed, `closed=${closed}`)
+  }
+
   // 9. 存档恢复（等自动存档后刷新；若遭遇战斗导致存档跳过则重试一次）
   async function waitStableAndSaved() {
     // 等待战斗结束（若有）

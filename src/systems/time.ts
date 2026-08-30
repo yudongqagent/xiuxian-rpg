@@ -12,6 +12,8 @@ export const REAL_SECONDS_PER_SHICHEN = 60
 export const TILES_PER_SHICHEN = 40
 export const DAYS_PER_SEASON = 15
 export const SEASONS = ['春', '夏', '秋', '冬'] as const
+/** 1 年 = 4 季 = 60 游戏日（世界历，V1.5 寿元也以此为 1 岁） */
+export const DAYS_PER_YEAR = DAYS_PER_SEASON * SEASONS.length
 /** 游戏内时辰显示名（取传统十二时辰之八，覆盖昼夜） */
 export const SHICHEN_NAMES = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未'] as const
 
@@ -35,6 +37,8 @@ export interface WorldSnapshot {
   labor?: { lastWorkDay?: number }
   /** 坊市风评（V1.4，GDD §3 声望→坊市物价）：-100..100，默认 0 */
   reputation?: number
+  /** 寿元（V1.5）：大境界硬锁/此世终结；推进由世界历驱动，无需存年龄 */
+  aging?: { lockedRealms?: string[]; ended?: boolean }
   // V2 扩：eventQueue / regionStates / seenHints / fog
 }
 
