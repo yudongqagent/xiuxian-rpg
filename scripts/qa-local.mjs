@@ -511,6 +511,40 @@ try {
     }
   }
 
+  // 8.92 事件风暴首例（V1.4）：旷工≥7日 + 张二记恨>2 → 张二告发 → 扣灵石20 + 坊市风评-20
+  {
+    await closeBattle()
+    // 读当前世界日（上工记录 = 8.91 偷摘当日）与本场灵石
+    const ctx = await page.evaluate(() => {
+      const w = window.__xiuxian?.scene.world?.()
+      const t = w?._now ?? window.__xiuxian?.scene.time.get?.()
+      const hud = document.querySelector('.hud')?.textContent ?? ''
+      const m = /灵石\s*(\d+)/.exec(hud)
+      return { day: t?.day ?? 1, day0: w?.labor?.lastWorkDay, lingshi: m ? +m[1] : -1, absent: w?.absentDays }
+    })
+    // 把记恨抬到 3+（>2），再把世界日推进到旷工≥7日后触发 time:state
+    await page.evaluate(() => window.__xiuxian?.scene['relations.bump']?.('zhang_er', { grudge: 3 }))
+    const dayTarget = ctx.day + 8
+    await page.evaluate((d) => window.__xiuxian?.scene.time.set(d, 3), dayTarget)
+    // 事件在 time:state 同步触发；轮询世界状态确认
+    let fires = null
+    for (let i = 0; i < 10 && !fires; i++) {
+      await page.waitForTimeout(400)
+      const w = await page.evaluate(() => window.__xiuxian?.scene.world?.())
+      if (w && w.events.length > 0) fires = w
+    }
+    const hudAfter = await page.locator('.hud').textContent().catch(() => '')
+    const lingshiAfter = /灵石\s*(\d+)/.exec(hudAfter ?? '')
+    const delta = ctx.lingshi >= 0 && lingshiAfter ? +lingshiAfter[1] - ctx.lingshi : NaN
+    const fired = fires?.events.includes('zayiyuan_shiqie') ?? false
+    const toastSeen = await page.locator('.toast', { hasText: /告发/ }).first().isVisible().catch(() => false)
+    add('事件「杂役院失窃」触发（旷工7日+记恨3）', fired && toastSeen && (fires?.absentDays ?? 0) >= 7,
+      `absent=${ctx.absent}→${fires?.absentDays} grudge=3 Δ灵石=${delta} rep=${fires?.reputation} toast=${toastSeen}`)
+    add('事件后果：扣灵石20 + 风评-20',
+      (fires?.reputation ?? 0) === -20 && (ctx.lingshi < 0 ? true : delta === Math.max(-20, -ctx.lingshi)),
+      `Δ灵石=${delta} rep=${fires?.reputation}`)
+  }
+
   // 9. 存档恢复（等自动存档后刷新；若遭遇战斗导致存档跳过则重试一次）
   async function waitStableAndSaved() {
     // 等待战斗结束（若有）
@@ -550,6 +584,16 @@ try {
   }
   const restoredClock = await clockAfterReload()
   add('时间轴存档保真', restoredClock.day > 1, `重载后 ${restoredClock.label || '（无时钟）'}`)
+
+  // 9.6 事件持久化（V1.4）：重载后风评仍为负、事件已结算标记仍在且不会二次触发
+  {
+    const w = await page.evaluate(() => window.__xiuxian?.scene.world?.())
+    const relLatest = await page.evaluate(() => window.__xiuxian?.scene.relations?.() ?? {})
+    const grudge = typeof relLatest.zhang_er?.grudge === 'number' ? relLatest.zhang_er.grudge : -1
+    add('事件入档不重触发（重载后）',
+      !!w && w.events.includes('zayiyuan_shiqie') && w.reputation === -20 && grudge >= 3,
+      `events=${JSON.stringify(w?.events)} rep=${w?.reputation} grudge=${grudge}`)
+  }
 
   add('全程无异常', pageErrors.length === 0, pageErrors.join(' | ').slice(0, 160))
 } finally {

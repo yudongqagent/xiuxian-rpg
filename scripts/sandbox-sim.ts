@@ -23,6 +23,17 @@ import {
   relationOf,
   GRUDGE_PER_THEFT,
 } from '../src/systems/relations'
+import type { WorldEvent } from '../src/systems/schemas'
+import {
+  absentWorkDays,
+  eventTriggered,
+  getReputation,
+  reputationLabel,
+  resolveConsequences,
+  sellPriceFactor,
+  buyPriceFactor,
+  setReputation,
+} from '../src/systems/worldEvents'
 
 let passed = 0
 let failed = 0
@@ -153,6 +164,61 @@ const check = (name: string, ok: boolean, detail = ''): void => {
   check('日程首条前（子时）回退null', npcSpotAt(schedule, { day: 1, shichen: 0 }) === null, String(npcSpotAt(schedule, { day: 1, shichen: 0 })))
   check('空日程/无日程回退null', npcSpotAt({}, { day: 1, shichen: 0 }) === null && npcSpotAt(undefined, { day: 1, shichen: 0 }) === null)
 }
+
+// 12. V1.4 事件风暴首例「杂役院失窃」：收工记录/条件求值/后果结算（纯函数回归）
+{
+  const evFixtures: WorldEvent = {
+    id: 'zayiyuan_shiqie',
+    name: '杂役院失窃',
+    nominee: 'zhang_er',
+    once: true,
+    trigger: { absentDays: 7, grudgeOf: 'zhang_er', grudgeAt: 2 },
+    consequences: { lingshi: 20, reputation: -20 },
+    toast: '{npc}告发你旷工多日……罚你二十灵石',
+  }
+
+  // 旷工计数：从未上工 → 自第 1 日起算；某日采药 → 从该日起算
+  check('从未上工：第1天旷工0天', absentWorkDays(undefined, 1) === 0, `absent=${absentWorkDays(undefined, 1)}`)
+  check('旷工满7天（7天前上工）', absentWorkDays(13, 20) === 7, `absent=${absentWorkDays(13, 20)}`)
+  check('当日上工不旷', absentWorkDays(20, 20) === 0, `absent=${absentWorkDays(20, 20)}`)
+  check('今日早于上工日钳制为0', absentWorkDays(25, 20) === 0, `absent=${absentWorkDays(25, 20)}`)
+
+  // 条件求值：旷工≥7 且 记恨>2
+  const rel1 = { zhang_er: { affinity: 0, grudge: 1 } }
+  const rel3 = { zhang_er: { affinity: 0, grudge: 3 } }
+  const ctxAuto = { day: 20, lastWorkDay: 13, relations: rel1 }
+  const ctxGentle = { day: 20, lastWorkDay: 19, relations: rel3 }
+  const ctxBoth = { day: 20, lastWorkDay: 13, relations: rel3 }
+  check('旷工不足不触发', !eventTriggered(evFixtures, ctxGentle), '施行温和')
+  check('记恨不足不触发', !eventTriggered(evFixtures, ctxAuto), '记恨1')
+  check('旷工+记恨齐备触发', eventTriggered(evFixtures, ctxBoth), '触发')
+
+  // 后果结算
+  const cons = resolveConsequences(evFixtures)
+  check('扣灵石20', cons.lingshiDelta === -20, `delta=${cons.lingshiDelta}`)
+  check('风评-20', cons.reputationDelta === -20, `delta=${cons.reputationDelta}`)
+}
+
+// 13. V1.4 坊市风评存储与物价系数（GDD §3 声望→坊市物价）
+{
+  setReputation(0)
+  check('默认风评0', getReputation() === 0, `rep=${getReputation()}`)
+  setReputation(-20)
+  check('负风评写入', getReputation() === -20, `rep=${getReputation()}`)
+  setReputation(-999)
+  check('下钳-100', getReputation() === -100, `rep=${getReputation()}`)
+  setReputation(999)
+  check('上钳100', getReputation() === 100, `rep=${getReputation()}`)
+  check('风评标签（0）', reputationLabel(0) === '不温不火', reputationLabel(0))
+  setReputation(-30)
+  check('负风评买贵', buyPriceFactor(getReputation()) > 1, `buy=${buyPriceFactor(getReputation())}`)
+  check('负风评卖贱', sellPriceFactor(getReputation()) < 1, `sell=${sellPriceFactor(getReputation())}`)
+  setReputation(50)
+  check('正风评买贱', buyPriceFactor(getReputation()) < 1, `buy=${buyPriceFactor(getReputation())}`)
+  check('正风评卖贵', sellPriceFactor(getReputation()) > 1, `sell=${sellPriceFactor(getReputation())}`)
+}
+// 清理：避免把测试注入的有副作用风评带进后续断言
+setReputation(0)
 
 console.log(`\nSANDBOX-SIM: ${passed} 项通过, ${failed} 项失败`)
 process.exit(failed === 0 ? 0 : 1)

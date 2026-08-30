@@ -36,6 +36,17 @@ import {
   npcSpotAt,
   type NpcRelationsState,
 } from '../systems/relations'
+// 2.0 事件风暴首例（V1.4）：旷工计数/条件求值/后果结算 + 坊市风评存储
+import {
+  WORLD_EVENTS,
+  absentWorkDays,
+  eventTriggered,
+  getReputation,
+  resolveConsequences,
+  setReputation,
+} from '../systems/worldEvents'
+// 2.0 事件风暴首例（V1.4）：Vite glob 注册事件表（仅浏览器侧）
+import { loadWorldEvents } from '../systems/worldEventLoader'
 // 2.0 时间轴：世界时刻推进与存档快照（V0.1 / V0.2）
 import {
   REAL_SECONDS_PER_SHICHEN,
@@ -127,6 +138,10 @@ export class WorldScene extends Phaser.Scene {
   private npcs: Array<{ id: string; sprite: Phaser.GameObjects.Image; label?: Phaser.GameObjects.Text }> = []
   /** 2.0 关系图雏形（V1.3）：好感/记恨状态，随 world 快照入档/恢复 */
   private relations: NpcRelationsState = createNpcRelationsState()
+  /** 2.0 事件风暴（V1.4）：已触发结算的事件 id 集合（once 去重，随 world 快照入档） */
+  private firedEvents: Set<string> = new Set()
+  /** 2.0 事件风暴（V1.4）：杂役上工记录（最后采药日 = 旷工计数锚） */
+  private labor: { lastWorkDay?: number } = {}
   private dialogueOpen = false
   private interactKey!: Phaser.Input.Keyboard.Key
   private prompt!: Phaser.GameObjects.Text
@@ -300,6 +315,12 @@ export class WorldScene extends Phaser.Scene {
     }
     // 2.0 关系图雏形（V1.3）：恢复好感/记恨（旧档缺省中性）
     this.relations = save?.world?.relations ? { ...save.world.relations } : createNpcRelationsState()
+    // 2.0 事件风暴（V1.4）：注册事件表（glob 一次性）
+    loadWorldEvents()
+    // 2.0 事件风暴（V1.4）：恢复已触发事件/上工记录/坊市风评（旧档缺省空/中性）
+    this.firedEvents = new Set(save?.world?.events ?? [])
+    this.labor = { lastWorkDay: save?.world?.labor?.lastWorkDay }
+    setReputation(save?.world?.reputation ?? 0)
 
     // 2.0 时间轴：真实时间驱动世界时刻（1 时辰 ≈ 60s 现实），期间事件队列至 V2
     let clockMs = 0
@@ -364,6 +385,19 @@ export class WorldScene extends Phaser.Scene {
           y: Math.floor(n.sprite.y / TILE),
         })),
       relations: () => ({ ...this.relations, _now: getWorldTime() }),
+      'relations.bump': (npcId: string, delta: { affine?: number; grudge?: number }) => {
+        this.relations = bumpRelation(this.relations, npcId, {
+          affinity: delta['affine'],
+          grudge: delta['grudge'],
+        })
+      },
+      world: () => ({
+          events: [...this.firedEvents],
+          labor: { ...this.labor },
+          reputation: getReputation(),
+          absentDays: absentWorkDays(this.labor.lastWorkDay, getWorldTime().day),
+          _now: getWorldTime(),
+        }),
       time: {
         get: () => getWorldTime(),
         advance: (shichen: number) => {
@@ -917,6 +951,8 @@ export class WorldScene extends Phaser.Scene {
         this.gatherSprites.forEach((s) => this.refreshGatherSprite(s))
         // 2.0 关系图雏形（V1.3）：日程化 NPC 顺时辰跑到自己的点位
         this.repositionScheduledNpcs()
+        // 2.0 事件风暴首例（V1.4）：世界时刻推进即评估事件条件（once 防重复）
+        this.runEventTicks()
       }),
       bus.on('navigate:quest', () => this.navigateToObjective()),
       bus.on('navigate:tile', ({ x, y }) => {
@@ -1122,6 +1158,34 @@ export class WorldScene extends Phaser.Scene {
     else spr.setAlpha(0.35).setScale(0.85)
   }
 
+  /** 2.0 事件风暴首例（V1.4）：世界时刻推进即评估事件条件，命中则结算后果并广播（once 防重复） */
+  private runEventTicks(): void {
+    if (this.transitioning || this.battleActive) return
+    const t = getWorldTime()
+    for (const ev of WORLD_EVENTS) {
+      if (ev.once && this.firedEvents.has(ev.id)) continue
+      const hit = eventTriggered(ev, {
+        day: t.day,
+        lastWorkDay: this.labor.lastWorkDay,
+        relations: this.relations,
+      })
+      if (!hit) continue
+      this.firedEvents.add(ev.id)
+      // 结算后果（文本/数值锚全部来自 content/events/*.json）
+      const r = resolveConsequences(ev)
+      if (r.lingshiDelta !== 0) {
+        updatePlayer((p) => ({ ...p, lingshi: Math.max(0, p.lingshi + r.lingshiDelta) }))
+        bus.emit('player:stats')
+      }
+      if (r.reputationDelta !== 0) setReputation(getReputation() + r.reputationDelta)
+      const who = resolveName('npc', ev.nominee)
+      bus.emit('quest:notify', { text: ev.toast.replace('{npc}', who || ev.nominee), kind: 'info' })
+      if (ev.after) bus.emit('quest:notify', { text: ev.after, kind: 'info' })
+      // 事件入档：立即落盘，防用户在结算后退出丢失（auto 档覆盖写）
+      void writeSave(this.snapshotSave(), AUTO_SLOT)
+    }
+  }
+
   /** 2.0 采集动作（V1.2）：消耗时辰 + 产出物入包 + 标记再生周期 */
   private tryGather(): void {
     if (this.transitioning || this.battleActive || this.dialogueOpen) return
@@ -1150,6 +1214,8 @@ export class WorldScene extends Phaser.Scene {
     }
     // 采集消耗时辰（推进世界时刻并刷新 HUD）
     this.spendTime(g.cost)
+    // V1.4 事件风暴：今日在杂役院采药（上工）→ 更新工作记录（旷工计数锚）
+    this.labor.lastWorkDay = getWorldTime().day
     // 产出入包
     const next = addItem(getPlayer(), g.itemId, 1)
     setPlayer(next)
@@ -1185,6 +1251,10 @@ export class WorldScene extends Phaser.Scene {
         gather: this.gatherWorld.byMap,
         // 2.0 关系图雏形（V1.3）：好感/记恨随世界快照入档（存档保真）
         relations: this.relations,
+        // 2.0 事件风暴首例（V1.4）：已触发事件/上工记录/坊市风评随世界快照入档
+        events: [...this.firedEvents],
+        labor: { lastWorkDay: this.labor.lastWorkDay },
+        reputation: getReputation(),
       },
     }
   }

@@ -29,6 +29,12 @@ export interface WorldSnapshot {
   gather?: Record<string, Record<string, number>>
   /** 关系图雏形（V1.3）：npcId → 好感/记恨（REDESIGN §6.2） */
   relations?: Record<string, NpcRelationState>
+  /** 事件风暴（V1.4）：已触发且结算的事件 id（once 事件防重复；REDESIGN §6.1） */
+  events?: string[]
+  /** 事件风暴（V1.4）：杂役上工记录（最后采药日），旷工计数锚 */
+  labor?: { lastWorkDay?: number }
+  /** 坊市风评（V1.4，GDD §3 声望→坊市物价）：-100..100，默认 0 */
+  reputation?: number
   // V2 扩：eventQueue / regionStates / seenHints / fog
 }
 

@@ -21,6 +21,14 @@ declare global {
         navDirect: (tx: number, ty: number) => void
         npcs: () => Array<{ id: string; x: number; y: number }>
         relations: () => Record<string, unknown>
+        'relations.bump': (npcId: string, delta: { affine?: number; grudge?: number }) => void
+        world: () => {
+          events: string[]
+          labor: { lastWorkDay?: number }
+          reputation: number
+          absentDays: number
+          _now: unknown
+        }
         flags: () => { dialogueOpen: boolean; battleActive: boolean; transitioning: boolean }
         time: { get: () => unknown; advance: (shichen: number) => void; set: (day: number, shichen: number) => void }
       }

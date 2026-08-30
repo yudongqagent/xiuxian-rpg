@@ -1,0 +1,17 @@
+{
+  "id": "zayiyuan_shiqie",
+  "name": "杂役院失窃",
+  "nominee": "zhang_er",
+  "once": true,
+  "trigger": {
+    "absentDays": 7,
+    "grudgeOf": "zhang_er",
+    "grudgeAt": 2
+  },
+  "consequences": {
+    "lingshi": 20,
+    "reputation": -20
+  },
+  "toast": "{npc}告发你旷工多日、又总在药园左近游荡，药园失窃八成与你脱不了干系！管事罚你二十灵石，坊市风评也随之一落。",
+  "after": "千叮万嘱：勤勉上工，莫再祸祸药园。"
+}

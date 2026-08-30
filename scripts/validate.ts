@@ -6,7 +6,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { z } from 'zod'
-import { ItemSchema, SkillSchema, NpcSchema, RegionSchema, DialogueSchema, EnemySchema, QuestSchema, GameMapSchema, WALKABLE_TILE_CHARS, RecipeSchema, ShopSchema } from '../src/systems/schemas'
+import { ItemSchema, SkillSchema, NpcSchema, RegionSchema, DialogueSchema, EnemySchema, QuestSchema, GameMapSchema, WALKABLE_TILE_CHARS, RecipeSchema, ShopSchema, WorldEventSchema } from '../src/systems/schemas'
 import { SHICHEN_NAMES } from '../src/systems/time'
 
 const ROOT = join(import.meta.dirname, '..', 'content')
@@ -37,6 +37,7 @@ check('对话', DialogueSchema, 'dialogues')
 check('妖兽', EnemySchema, 'enemies')
 check('配方', RecipeSchema, 'recipes')
 check('商店', ShopSchema, 'shops')
+check('事件', WorldEventSchema, 'events')
 check('任务', QuestSchema, 'quests')
 check('地图', GameMapSchema, 'maps')
 
@@ -246,6 +247,13 @@ function checkRefs() {
     }
     const out = (recipe['output'] as { item?: string })?.item
     if (out && !itemIds.has(out)) refErr(`配方 ${rid}`, '产物', out)
+  }
+  for (const event of readAll('events')) {
+    const eid = String(event['id'])
+    const nominee = (event['nominee'] as string) ?? ''
+    if (nominee && !npcIds.has(nominee)) refErr(`事件 ${eid}`, '告发者', nominee)
+    const grudgeOf = ((event['trigger'] as { grudgeOf?: string })?.grudgeOf) ?? ''
+    if (grudgeOf && !npcIds.has(grudgeOf)) refErr(`事件 ${eid}`, '记恨来源', grudgeOf)
   }
   console.log('✓ 引用完整性校验通过')
 }

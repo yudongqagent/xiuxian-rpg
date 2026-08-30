@@ -177,6 +177,36 @@ export const QuestStepSchema = z.discriminatedUnion('kind', [
 ])
 
 /** INV-5：商店（NPC 摊位 wares） */
+/** 事件风暴（V1.4，REDESIGN §6.1）：世界条件齐备即触发 → 一次性后果结算 */
+export const WorldEventSchema = z.object({
+  id: z.string().regex(/^[a-z0-9_]+$/),
+  name: z.string().min(1).max(20),
+  /** 告发者/主事 NPC id（供文案与图标记；validate 校验存在性） */
+  nominee: z.string().regex(/^[a-z0-9_]+$/),
+  /** 只触发一次（防刷屏；重复游玩需新档） */
+  once: z.boolean().default(true),
+  trigger: z.object({
+    /** 连续旷工日数阈值：lastWorkDay 距今日 ≥ 此值 */
+    absentDays: z.number().int().min(1).max(999),
+    /** 记恨来源 NPC id（validate 校验存在性） */
+    grudgeOf: z.string().regex(/^[a-z0-9_]+$/),
+    /** 记恨须严格大于此值（如 grudgeAt=2 表示记恨>2） */
+    grudgeAt: z.number().int().min(0).max(100),
+  }),
+  consequences: z.object({
+    /** 扣灵石（正数=扣；clamp≥0） */
+    lingshi: z.number().int().min(1).max(99999),
+    /** 坊市风评变化（负=下降；clamp -100..100） */
+    reputation: z.number().int().min(-100).max(100),
+  }),
+  /** 触发文案（≤200 字，古典白话；{npc} 会被替换为告发者名） */
+  toast: z.string().min(1).max(200),
+  /** 触发后追加的系统提示 */
+  after: z.string().min(1).max(100).optional(),
+})
+
+export type WorldEvent = z.infer<typeof WorldEventSchema>
+
 export const ShopSchema = z.object({
   id: z.string().regex(/^[a-z0-9_]+$/),
   name: z.string().min(1).max(30),
