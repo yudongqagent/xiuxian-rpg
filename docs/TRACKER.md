@@ -221,4 +221,6 @@
 | 2026-08-26 | feat-content-polish：①跨图自动寻路修复——checkPortalProximity() 补偿 overlap 不触发 + resumeNavRoute() 此前定义未调用导致穿图后续航断裂；nav.ts 跨图 BFS 路由模块；②全量妖兽经验/掉落补齐（13/13 只完整，含 special 字段）；③新增万宝楼掌柜+百药园管事两家商店；④金光商人/万宝楼掌柜对话分支化；⑤qa-local 19/19、combat 80/80、quest 52/52、validate ✅ | 已发布 |
 
 | 2026-08-29 | 2.0 立项：REDESIGN.md（因果沙盒重构设计）+ DEVELOPMENT_PROCESS.md（V0–V5 全流程），决策=现有项目重做 2.0 / 纯单机沙盒 | 已发布（文档） |
-| 2026-08-29 | V0 时间轴：①time.ts 时辰(1/8日)→日→季节→年 + 可订阅存储，1时辰≈60s现实；②SaveData 增 world 快照（additive 兼容旧档）；③Hud 时钟显示；④G3b sandbox-sim 门禁 14 项；⑤qa-local +2 场景 21/21。G1/G2/G3/G3b/G4 全绿 | 待合并 |
+| 2026-08-30 | V0 时间轴：①time.ts 时辰(1/8日)→日→季节→年 + 可订阅存储，1时辰≈60s现实；②SaveData 增 world 快照（additive 兼容旧档）；③Hud 时钟显示；④G3b sandbox-sim 门禁 14 项；⑤qa-local +2 场景 21/21。G1/G2/G3/G3b/G4 全绿 | 已发布 |
+| 2026-08-30 | V1.1 时间成本：①TILES_PER_SHICHEN=40（40格=1时辰，纯函数 tilesToShichen）；②移动时辰消耗 + 世界踱步加速；③战斗/跨图传送附加时辰成本；④qa-local 时间轴断言加固（推进≥1日/存档不回退）→ 21/21；⑤sandbox-sim 17 项 | 已发布 |
+| 2026-08-30 | V1.2 采集点系统：①MapGatherPointSchema（itemId/cost/regen/label + 越界&引用校验）；②纯函数 gather.ts（isGatherAvailable/gatherAt/绝对时辰索引再生）；③WorldScene 渲染/交互/存档（world.gather 世界快照）；④杂役院教学图 30×22（4 采集点+传送往返，落点错位修复无限往返 bug）；⑤sandbox-sim 22 项；⑥qa-local 场景 8.9 采集 E2E → 23/23。G1/G2/G3/G3b/G4 全绿 | 已发布 |
