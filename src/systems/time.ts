@@ -27,7 +27,17 @@ export interface WorldSnapshot {
   time: WorldTimeData
   /** 2.0 采集点再生进度（V1.2）：mapId → pointId → 下次可采绝对时辰；缺省整图为可采 */
   gather?: Record<string, Record<string, number>>
-  // V2 扩：npcStates / eventQueue / regionStates / seenHints / fog
+  /** 关系图雏形（V1.3）：npcId → 好感/记恨（REDESIGN §6.2） */
+  relations?: Record<string, NpcRelationState>
+  // V2 扩：eventQueue / regionStates / seenHints / fog
+}
+
+/** 单个 NPC 对玩家的关系状态（好感为正、记恨为负；V1.3 窗口见三角形箭头标注） */
+export interface NpcRelationState {
+  /** 好感 -100..100 */
+  affinity: number
+  /** 记恨 0..100 */
+  grudge: number
 }
 
 export function createWorldTime(): WorldTimeData {

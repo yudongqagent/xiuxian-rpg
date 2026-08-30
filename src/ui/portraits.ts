@@ -33,6 +33,14 @@ const SPECS: Record<string, PortraitSpec> = {
     skin: '#e6cfa8', hair: '#4a4038', robe: '#3d2f22', robeDark: '#2c2118', trim: '#a08050',
     hairStyle: 'topknot', brows: 'angled', accessories: ['shortBeard'],
   },
+  zhang_er: {
+    skin: '#e0c9a0', hair: '#3a2c20', robe: '#5c5038', robeDark: '#423a28', trim: '#b8a878',
+    hairStyle: 'shaved', brows: 'thick', accessories: ['scar', 'whiskers'],
+  },
+  li_san: {
+    skin: '#e8cda4', hair: '#2c2418', robe: '#47608a', robeDark: '#33466a', trim: '#c4b078',
+    hairStyle: 'loosebun', brows: 'angled', accessories: ['shortBeard'],
+  },
   wang_zhangmen: {
     skin: '#e8cfa5', hair: '#8a8578', robe: '#2f3a52', robeDark: '#232c40', trim: '#ffd97a',
     hairStyle: 'topknot', brows: 'thick', accessories: ['longBeard', 'guanPin'],

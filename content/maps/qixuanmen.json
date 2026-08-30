@@ -94,6 +94,11 @@
       "npcId": "wanbaolou_zhanggui",
       "x": 25,
       "y": 20
+    },
+    {
+      "npcId": "li_san",
+      "x": 16,
+      "y": 19
     }
   ],
   "enemySpawns": [],

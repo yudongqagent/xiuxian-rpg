@@ -7,6 +7,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { z } from 'zod'
 import { ItemSchema, SkillSchema, NpcSchema, RegionSchema, DialogueSchema, EnemySchema, QuestSchema, GameMapSchema, WALKABLE_TILE_CHARS, RecipeSchema, ShopSchema } from '../src/systems/schemas'
+import { SHICHEN_NAMES } from '../src/systems/time'
 
 const ROOT = join(import.meta.dirname, '..', 'content')
 
@@ -65,6 +66,44 @@ function tileWalkable(rows: string[], x: number, y: number): boolean {
 function refErr(owner: string, label: string, id: string) {
   errors++
   console.error(`✗ [引用] ${owner} 的${label} "${id}" 不存在`)
+}
+
+/** V1.3 日程校验：NPC 日程点位必须落在其 npcPlacements 所在地图的可行走格上 */
+function checkSchedules() {
+  const maps = readAll('maps') as unknown as RawMap[]
+  const placements = new Map<string, RawMap[]>()
+  for (const m of maps) {
+    for (const n of m.npcPlacements) {
+      const list = placements.get(n.npcId) ?? []
+      list.push(m)
+      placements.set(n.npcId, list)
+    }
+  }
+  for (const npc of readAll('npcs')) {
+    const id = String(npc['id'])
+    const schedule = (npc['schedule'] ?? null) as null | Record<string, [number, number]>
+    if (!schedule) continue
+    const hosts = placements.get(id)
+    if (!hosts || hosts.length === 0) {
+      errors++
+      console.error(`✗ [日程] NPC ${id} 有 schedule 但未在任何地图 npcPlacements 摆位`)
+      continue
+    }
+    for (const entry of Object.entries(schedule)) {
+      const [at, [x, y]] = entry
+      if (!SHICHEN_NAMES.includes(at as (typeof SHICHEN_NAMES)[number])) {
+        errors++
+        console.error(`✗ [日程] NPC ${id} 使用了非法时辰键 "${at}"（合法：${SHICHEN_NAMES.join('/')}）`)
+        continue
+      }
+      const walkableAnywhere = hosts.some((m) => tileWalkable(m.rows, x, y))
+      if (!walkableAnywhere) {
+        errors++
+        console.error(`✗ [日程] NPC ${id} 于「${at}」的点位 (${x},${y}) 在其摆位地图上不可行走`)
+      }
+    }
+  }
+  console.log('✓ 日程点位校验通过')
 }
 
 function checkRefs() {
@@ -183,6 +222,7 @@ function checkRefs() {
       if (!itemIds.has(g.itemId)) refErr(`地图 ${mid} 采集点 ${g.id}`, '产出物', g.itemId)
     }
   }
+  checkSchedules()
   for (const enemy of readAll('enemies')) {
     const eid = String(enemy['id'])
     const loot = Array.isArray(enemy['loot']) ? (enemy['loot'] as Array<{ item?: string }>) : []

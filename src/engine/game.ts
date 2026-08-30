@@ -19,8 +19,10 @@ declare global {
           now: number
         }
         navDirect: (tx: number, ty: number) => void
+        npcs: () => Array<{ id: string; x: number; y: number }>
+        relations: () => Record<string, unknown>
         flags: () => { dialogueOpen: boolean; battleActive: boolean; transitioning: boolean }
-        time: { get: () => unknown; advance: (shichen: number) => void }
+        time: { get: () => unknown; advance: (shichen: number) => void; set: (day: number, shichen: number) => void }
       }
     }
   }

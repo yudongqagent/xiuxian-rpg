@@ -182,5 +182,14 @@ export class BootScene extends Phaser.Scene {
       c.fillStyle = '#e8e4da'
       c.fillRect(9, 10, 4, 6)
     })
+    make('npc-worker', '#5c5038', '#b8a878', (c) => {
+      c.fillStyle = '#3a2c20'
+      c.fillRect(4, 0, 14, 3)
+    })
+    make('npc-roamer', '#47608a', '#c4b078', (c) => {
+      c.fillStyle = '#c4b078'
+      c.fillRect(2, 10, 3, 3)
+      c.fillRect(17, 10, 3, 3)
+    })
   }
 }

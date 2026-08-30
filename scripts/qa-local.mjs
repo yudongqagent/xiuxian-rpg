@@ -471,6 +471,46 @@ try {
     }
   }
 
+  // 8.91 关系图雏形（V1.3）：辰时张二盯梢（22,4）目击药园偷摘 sp_lingcao_b(22,6) → 记恨+1
+  {
+    await closeBattle()
+    // 推进到「辰时」：若当前时辰已过辰时则顺延到次日辰时（time.set 钩子）
+    const target = await page.evaluate(() => {
+      const t = window.__xiuxian?.scene.time.get?.()
+      if (!t) return null
+      const day = t.shichen > 4 ? t.day + 1 : t.day
+      window.__xiuxian.scene.time.set(day, 4)
+      return { day, shichen: 4 }
+    })
+    add('debug 时间扳手 time.set(辰时)', target !== null, JSON.stringify(target))
+    if (target) {
+      // time.set 触发时间:state → 张二赶位 tween（700ms）；轮询直到落定在盯梢位 (22,4)
+      let zhang = null
+      let settled = false
+      for (let i = 0; i < 12 && !settled; i++) {
+        await page.waitForTimeout(400)
+        const npcs = await page.evaluate(() => window.__xiuxian?.scene.npcs?.() ?? [])
+        zhang = npcs.find((n) => n.id === 'zhang_er')
+        settled = !!(zhang && zhang.x === 22 && zhang.y === 4)
+      }
+      add('辰时张二在盯梢位 (22,4)', settled, JSON.stringify(zhang ?? 'not found'))
+      // 玩家走到采集点 (22,6) 正下方 (22,7) 偷摘
+      await page.evaluate(() => window.__xiuxian?.scene.navDirect(22, 7))
+      let reached = false
+      for (let i = 0; i < 30 && !reached; i++) {
+        await page.waitForTimeout(800)
+        const p = await pos()
+        reached = !!p && Math.abs(p.x - 22) <= 1 && Math.abs(p.y - 7) <= 1
+      }
+      await page.keyboard.down('e'); await page.waitForTimeout(200); await page.keyboard.up('e')
+      await page.waitForTimeout(900)
+      const rel = await page.evaluate(() => window.__xiuxian?.scene.relations?.() ?? {})
+      const grudge = typeof rel.zhang_er?.grudge === 'number' ? rel.zhang_er.grudge : -1
+      const toastSeen = await page.locator('.toast', { hasText: /记恨/ }).first().isVisible().catch(() => false)
+      add('张二目击偷摘 → 记恨+1', grudge >= 1 && toastSeen, `grudge=${grudge} reached=${reached} toast=${toastSeen}`)
+    }
+  }
+
   // 9. 存档恢复（等自动存档后刷新；若遭遇战斗导致存档跳过则重试一次）
   async function waitStableAndSaved() {
     // 等待战斗结束（若有）

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { SHICHEN_NAMES } from './time'
 
 /** 所有 content/ 下数据的契约。AI 生成新内容必须符合 schema，CI 自动校验。 */
 
@@ -71,6 +72,13 @@ export const SkillSchema = z.object({
     .optional(),
 })
 
+/** NPC 日程表：时辰名 → [x,y] 点位（V1.3，REDESIGN §6.2） */
+export const NpcScheduleSchema = z.record(
+  z.enum(SHICHEN_NAMES),
+  z.tuple([z.number().int().min(0), z.number().int().min(0)]),
+)
+export type NpcSchedule = z.infer<typeof NpcScheduleSchema>
+
 export const NpcSchema = z.object({
   id: z.string().regex(/^[a-z0-9_]+$/),
   name: z.string().min(1).max(20),
@@ -78,6 +86,10 @@ export const NpcSchema = z.object({
   regionId: z.string(),
   personality: z.enum(['仁善', '狡诈', '冷傲', '豪爽', '神秘']),
   dialogues: z.array(z.string()).min(1),
+  /** 每日日程（V1.3）：时辰名 → [x,y] 点位；空或缺省 = 静态站位（此字段用于 NPC 关键点位移动） */
+  schedule: NpcScheduleSchema.optional(),
+  /** 目击半径（格）：柳锁行为，如张二在药园盯梢（V1.3 记恨池） */
+  watchRadius: z.number().int().min(1).max(12).optional(),
 })
 
 export const RegionSchema = z.object({

@@ -16,6 +16,13 @@ import {
   yearOf,
 } from '../src/systems/time'
 import { gatherAt, isGatherAvailable } from '../src/systems/gather'
+import {
+  bumpRelation,
+  createNpcRelationsState,
+  npcSpotAt,
+  relationOf,
+  GRUDGE_PER_THEFT,
+} from '../src/systems/relations'
 
 let passed = 0
 let failed = 0
@@ -116,6 +123,35 @@ const check = (name: string, ok: boolean, detail = ''): void => {
   check('再生到期可采（第4日）', isGatherAvailable(after, 'zayiyuan', 'sp_lingcao', d4), '24<=24')
   const unaffected = gatherAt(ws, 'qixuanmen', 'other', 5, t)
   check('不同地图状态互不串扰', unaffected.byMap.zayiyuan === undefined, JSON.stringify(unaffected.byMap))
+}
+
+// 10. V1.3 关系图：记恨写回 + 钳制 + 目击半径内偷摘（纯函数回归）
+{
+  const state = createNpcRelationsState()
+  check('初始中性关系', relationOf(state, 'zhang_er').grudge === 0 && relationOf(state, 'zhang_er').affinity === 0, JSON.stringify(relationOf(state, 'zhang_er')))
+  const after = bumpRelation(state, 'zhang_er', { grudge: GRUDGE_PER_THEFT })
+  check('偷摘一次记恨+1', relationOf(after, 'zhang_er').grudge === 1, JSON.stringify(relationOf(after, 'zhang_er')))
+  const clamped = bumpRelation(after, 'zhang_er', { grudge: 999 })
+  check('记恨钳制在100', relationOf(clamped, 'zhang_er').grudge === 100, String(relationOf(clamped, 'zhang_er').grudge))
+  const neg = bumpRelation(state, 'zhang_er', { grudge: -5 })
+  check('记恨负值钳制为0', relationOf(neg, 'zhang_er').grudge === 0, String(relationOf(neg, 'zhang_er').grudge))
+  check('记恨不改好感', relationOf(after, 'zhang_er').affinity === 0, String(relationOf(after, 'zhang_er').affinity))
+  const multi = bumpRelation(state, 'zhang_er', { grudge: 3 }).zhang_er
+  check('记恨+3=3', multi.grudge === 3, JSON.stringify(multi))
+}
+
+// 11. V1.3 日程查表：时辰 → 点位；无匹配/空日程回退 null（纯函数回归）
+{
+  const schedule = {
+    卯: [22, 4],
+    辰: [22, 4],
+    午: [6, 16],
+  } as Parameters<typeof npcSpotAt>[0]
+  check('卯时点位', JSON.stringify(npcSpotAt(schedule, { day: 1, shichen: 3 })) === '{"x":22,"y":4}', JSON.stringify(npcSpotAt(schedule, { day: 1, shichen: 3 })))
+  check('辰时点位', JSON.stringify(npcSpotAt(schedule, { day: 1, shichen: 4 })) === '{"x":22,"y":4}', JSON.stringify(npcSpotAt(schedule, { day: 1, shichen: 4 })))
+  check('午时回后段点位', JSON.stringify(npcSpotAt(schedule, { day: 1, shichen: 6 })) === '{"x":6,"y":16}', JSON.stringify(npcSpotAt(schedule, { day: 1, shichen: 6 })))
+  check('日程首条前（子时）回退null', npcSpotAt(schedule, { day: 1, shichen: 0 }) === null, String(npcSpotAt(schedule, { day: 1, shichen: 0 })))
+  check('空日程/无日程回退null', npcSpotAt({}, { day: 1, shichen: 0 }) === null && npcSpotAt(undefined, { day: 1, shichen: 0 }) === null)
 }
 
 console.log(`\nSANDBOX-SIM: ${passed} 项通过, ${failed} 项失败`)

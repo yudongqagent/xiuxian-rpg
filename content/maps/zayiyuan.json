@@ -43,7 +43,13 @@
       "label": "北·山村"
     }
   ],
-  "npcPlacements": [],
+  "npcPlacements": [
+    {
+      "npcId": "zhang_er",
+      "x": 13,
+      "y": 10
+    }
+  ],
   "enemySpawns": [],
   "props": [
     {

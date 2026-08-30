@@ -27,7 +27,15 @@ import {
   toPlayerSave,
   updatePlayer,
 } from '../systems/player'
-import { enemiesDropping, regionQiDensity, resolveName } from '../systems/contentNames'
+import { enemiesDropping, npcScheduleFor, npcWatchRadiusFor, regionQiDensity, resolveName } from '../systems/contentNames'
+// 2.0 关系图雏形：好感/记恨写回 + 日程查表（V1.3）
+import {
+  GRUDGE_PER_THEFT,
+  bumpRelation,
+  createNpcRelationsState,
+  npcSpotAt,
+  type NpcRelationsState,
+} from '../systems/relations'
 // 2.0 时间轴：世界时刻推进与存档快照（V0.1 / V0.2）
 import {
   REAL_SECONDS_PER_SHICHEN,
@@ -116,7 +124,9 @@ export class WorldScene extends Phaser.Scene {
   private joyVec = { x: 0, y: 0 }
   private keyState: () => { x: number; y: number } = () => ({ x: 0, y: 0 })
   private unsubs: Array<() => void> = []
-  private npcs: Array<{ id: string; sprite: Phaser.GameObjects.Image }> = []
+  private npcs: Array<{ id: string; sprite: Phaser.GameObjects.Image; label?: Phaser.GameObjects.Text }> = []
+  /** 2.0 关系图雏形（V1.3）：好感/记恨状态，随 world 快照入档/恢复 */
+  private relations: NpcRelationsState = createNpcRelationsState()
   private dialogueOpen = false
   private interactKey!: Phaser.Input.Keyboard.Key
   private prompt!: Phaser.GameObjects.Text
@@ -282,10 +292,14 @@ export class WorldScene extends Phaser.Scene {
     restoreQuests(save?.quests)
     // 2.0 时间轴：恢复世界时刻（旧档缺省按开局第一天）
     setWorldTime(fromWorldSnapshot(save?.world))
+    // 2.0 关系图雏形（V1.3）：恢复世界时刻后，日程化 NPC 由旧档时刻/开局时刻跑到正确点位
+    this.repositionScheduledNpcs()
     // 2.0 采集点：恢复再生进度（旧档缺省全图可采；跨图不丢失）
     this.gatherWorld = {
       byMap: save?.world?.gather ? { ...save.world.gather } : {},
     }
+    // 2.0 关系图雏形（V1.3）：恢复好感/记恨（旧档缺省中性）
+    this.relations = save?.world?.relations ? { ...save.world.relations } : createNpcRelationsState()
 
     // 2.0 时间轴：真实时间驱动世界时刻（1 时辰 ≈ 60s 现实），期间事件队列至 V2
     let clockMs = 0
@@ -343,10 +357,21 @@ export class WorldScene extends Phaser.Scene {
         now: absoluteShichen(getWorldTime()),
       }),
       navDirect: (tx: number, ty: number) => this.startAutoPathTo(tx, ty),
+      npcs: () =>
+        this.npcs.map((n) => ({
+          id: n.id,
+          x: Math.floor(n.sprite.x / TILE),
+          y: Math.floor(n.sprite.y / TILE),
+        })),
+      relations: () => ({ ...this.relations, _now: getWorldTime() }),
       time: {
         get: () => getWorldTime(),
         advance: (shichen: number) => {
           advanceWorldTime(shichen)
+          bus.emit('time:state', getWorldTime())
+        },
+        set: (day: number, shichen: number) => {
+          setWorldTime({ day: Math.max(1, Math.floor(day)), shichen })
           bus.emit('time:state', getWorldTime())
         },
       },
@@ -545,18 +570,21 @@ export class WorldScene extends Phaser.Scene {
 
   private placeNpcs(): void {
     this.npcs = []
+    // 2.0 关系图雏形（V1.3）：日程化 NPC 按当前时辰查表摆位（缺省回退到 npcPlacements 静态站位）
+    const now = getWorldTime()
     this.gameMap.npcPlacements.forEach(({ npcId, x, y }) => {
+      const spot = npcSpotAt(npcScheduleFor(npcId), now) ?? { x, y }
       // ==== rich-graphics：按身份换装 + 待机浮动 ====
       const sprite = this.physics.add.staticImage(
-        x * TILE + TILE / 2,
-        y * TILE + TILE / 2,
+        spot.x * TILE + TILE / 2,
+        spot.y * TILE + TILE / 2,
         npcTextureFor(npcId),
       )
       idleBob(this, sprite, 1.6)
       sprite.setInteractive({ useHandCursor: true })
       sprite.on('pointerdown', () => this.tryInteract())
       void import('../systems/contentNames').then((m) => {
-        this.add
+        const label = this.add
           .text(sprite.x, sprite.y - 26, m.resolveName('npc', npcId), {
             fontSize: '11px',
             color: '#ffe9b0',
@@ -565,11 +593,40 @@ export class WorldScene extends Phaser.Scene {
           })
           .setOrigin(0.5, 1)
           .setDepth(6)
+        const entry = this.npcs.find((n) => n.id === npcId)
+        if (entry) entry.label = label
       })
       this.npcs.push({ id: npcId, sprite })
     })
     // ==== gfx-battle-ui：NPC 待机动作池 + 对话面向玩家（GFX2-A3）====
     attachNpcLife(this, this.npcs.map((n) => n.sprite))
+  }
+
+  /** 2.0 关系图雏形（V1.3）：日程化 NPC 在时辰变化后跑到新点位（tween 表现行走） */
+  private repositionScheduledNpcs(): void {
+    const now = getWorldTime()
+    for (const entry of this.npcs) {
+      const schedule = npcScheduleFor(entry.id)
+      const spot = npcSpotAt(schedule, now)
+      if (!spot) continue
+      const sx = spot.x * TILE + TILE / 2
+      const sy = spot.y * TILE + TILE / 2
+      if (Math.abs(entry.sprite.x - sx) < 2 && Math.abs(entry.sprite.y - sy) < 2) continue
+      // 停掉待机浮动 tween，改播一段"赶路"，到达后再恢复浮动
+      this.tweens.killTweensOf(entry.sprite)
+      this.tweens.add({
+        targets: entry.sprite,
+        x: sx,
+        y: sy,
+        duration: 700,
+        ease: 'Sine.easeOut',
+        onComplete: () => idleBob(this, entry.sprite, 1.6),
+      })
+      if (entry.label) {
+        this.tweens.killTweensOf(entry.label)
+        this.tweens.add({ targets: entry.label, x: sx, y: sy - 26, duration: 700, ease: 'Sine.easeOut' })
+      }
+    }
   }
 
   /** setScale 不缩放物理体：按缩放后视觉尺寸重建命中盒（居中收窄），保证任意方向接触都能触发遭遇 */
@@ -856,7 +913,11 @@ export class WorldScene extends Phaser.Scene {
       bus.on('battle:opened', () => (this.battleAcked = true)),
       bus.on('meditate:toggle', () => this.toggleMeditate()),
       // 2.0 时间轴（V1.2）：世界时刻推进后刷新采集点可采外观（再生到期自动亮起）
-      bus.on('time:state', () => this.gatherSprites.forEach((s) => this.refreshGatherSprite(s))),
+      bus.on('time:state', () => {
+        this.gatherSprites.forEach((s) => this.refreshGatherSprite(s))
+        // 2.0 关系图雏形（V1.3）：日程化 NPC 顺时辰跑到自己的点位
+        this.repositionScheduledNpcs()
+      }),
       bus.on('navigate:quest', () => this.navigateToObjective()),
       bus.on('navigate:tile', ({ x, y }) => {
         setNavRoute(null)
@@ -1068,6 +1129,25 @@ export class WorldScene extends Phaser.Scene {
     if (!near || !near.available) return
     const g = gatherPointById(this.gameMap, near.sprite.data.get('pointId') as string)
     if (!g) return
+    // 2.0 关系图雏形（V1.3）：偷摘当下若有盯梢者目击（watchRadius 内），先记恨+1 再结算时间
+    // （验收：张二在辰时能看到玩家在药园偷摘 → 记恨+1；被逮住那一刻的"在犯案"才计恨）
+    for (const npc of this.npcs) {
+      const radius = npcWatchRadiusFor(npc.id)
+      if (radius <= 0) continue
+      const d = Phaser.Math.Distance.Between(
+        near.sprite.x,
+        near.sprite.y,
+        npc.sprite.x,
+        npc.sprite.y,
+      )
+      if (d <= radius * TILE + TILE / 2) {
+        this.relations = bumpRelation(this.relations, npc.id, { grudge: GRUDGE_PER_THEFT })
+        bus.emit('quest:notify', {
+          text: `${resolveName('npc', npc.id)}撞见你偷摘「${g.label}」，记恨 +${GRUDGE_PER_THEFT}`,
+          kind: 'info',
+        })
+      }
+    }
     // 采集消耗时辰（推进世界时刻并刷新 HUD）
     this.spendTime(g.cost)
     // 产出入包
@@ -1103,6 +1183,8 @@ export class WorldScene extends Phaser.Scene {
         ...toWorldSnapshot(getWorldTime()),
         // 2.0 采集点再生进度（V1.2）随世界快照入档
         gather: this.gatherWorld.byMap,
+        // 2.0 关系图雏形（V1.3）：好感/记恨随世界快照入档（存档保真）
+        relations: this.relations,
       },
     }
   }

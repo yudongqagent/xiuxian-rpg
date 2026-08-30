@@ -186,6 +186,8 @@ const NPC_PALETTES: Record<string, string> = {
   li_feiyu: 'npc-youth',
   mo_caihuan: 'npc-maiden',
   chaopeng_laoren: 'npc-elder',
+  zhang_er: 'npc-worker',
+  li_san: 'npc-roamer',
 }
 
 const ENEMY_VISUALS: Record<string, { tex: string; scale: number; boss: boolean }> = {
