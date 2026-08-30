@@ -14,16 +14,24 @@ import {
   tilesToShichen,
   toWorldSnapshot,
   yearOf,
+  type WorldTimeData,
 } from '../src/systems/time'
-import { gatherAt, isGatherAvailable } from '../src/systems/gather'
+import {
+  createGatherWorldState,
+  gatherAt,
+  isGatherAvailable,
+  type GatherWorldState,
+} from '../src/systems/gather'
 import {
   bumpRelation,
   createNpcRelationsState,
   npcSpotAt,
   relationOf,
   GRUDGE_PER_THEFT,
+  type NpcRelationsState,
 } from '../src/systems/relations'
 import type { WorldEvent } from '../src/systems/schemas'
+import { EnemySchema, RecipeSchema } from '../src/systems/schemas'
 import {
   absentWorkDays,
   eventTriggered,
@@ -37,13 +45,24 @@ import {
 import {
   addItem,
   attemptBreakthrough,
+  buyItem,
+  createPlayer,
   expToNext,
   fromPlayerSave,
   gateAt,
   grantExp,
+  meditateTick,
+  removeItem,
+  respawnPenalty,
+  sellItem,
   setRngOverride,
   statsForLevel,
+  syncAfterBattle,
+  type PlayerState,
 } from '../src/systems/player'
+import { createBattle, expReward, playerAttack, rollLoot } from '../src/systems/combat'
+import { canCraft, craft } from '../src/systems/alchemy'
+import { applyBuyPrice, bestSellPrice } from '../src/systems/market'
 import {
   INIT_AGE,
   ageOf,
@@ -60,6 +79,12 @@ import {
   setAging,
   subscribeAging,
 } from '../src/systems/lifespan'
+import huiLangJson from '../content/enemies/hui_lang.json'
+import rHuichunSanJson from '../content/recipes/r_huichun_san.json'
+import zayiyuanShiqieJson from '../content/events/zayiyuan_shiqie.json'
+import wanbaolouJson from '../content/shops/wanbaolou_zhanggui.json'
+import maguanshiJson from '../content/shops/ma_guanshi.json'
+import jinguangJson from '../content/shops/jin_guang_shangren.json'
 
 let passed = 0
 let failed = 0
@@ -297,6 +322,248 @@ setReputation(0)
   check('aging 存储写入/订阅/读回', fired === 2 && isRealmLocked(getAging(), '筑基') && getAging().ended, `fired=${fired} state=${JSON.stringify(getAging())}`)
   setAging(createAgingState())
   check('aging 复位', getAging().lockedRealms.length === 0 && getAging().ended === false, JSON.stringify(getAging()))
+}
+
+// 17. V1.6 涌现行为矩阵（DEVELOPMENT_PROCESS §5.3 出口证据）：5 策略 × 30 日因果分流
+// 机械规则全部复用既有纯函数与配置内容：采集再生 gather.ts / 战斗 combat.ts / 炼丹 alchemy.ts /
+// 坊市价格 worldEvents+shop / 关系 relations / 时间 time / 事件 content/events/zayiyuan_shiqie.json。
+// 诚实标注的场外假定：战斗/采集各耗 1 时辰，炼丹与售卖 0 时辰（工艺不占时辰）；战点取彩霞山灰狼
+// （shanji 野怪点，灵气密度 1.5，战斗恢复秒回），采集点取杂役院（qixuan_men 密度 1.0）；不计跨图往返。
+{
+  const enemy = EnemySchema.parse(huiLangJson as never)
+  const EVENT = zayiyuanShiqieJson as unknown as WorldEvent
+  const RECIPE = RecipeSchema.parse(rHuichunSanJson as never)
+  const STOCKS = {
+    [String(wanbaolouJson['id'])]: { wares: wanbaolouJson['wares'] },
+    [String(maguanshiJson['id'])]: { wares: maguanshiJson['wares'] },
+    [String(jinguangJson['id'])]: { wares: jinguangJson['wares'] },
+  }
+
+  const RNG: () => number = (() => {
+    let seed = 0x51ab7e
+    return () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648
+      return seed / 2147483648
+    }
+  })()
+
+  const GATHER_POINTS = [
+    { id: 'sp_lingcao_a', item: 'qi_xie_ling_cao', regen: 24, watched: false },
+    { id: 'sp_lingcao_b', item: 'qi_xie_ling_cao', regen: 24, watched: true },
+    { id: 'sp_lingru', item: 'qiannian_lingru', regen: 72, watched: false },
+    { id: 'sp_lingzhi', item: 'bai_nian_ling_zhi', regen: 48, watched: false },
+  ] as const
+  const WATCHED: ReadonlySet<number> = new Set([3, 4, 5])
+  const YAO_FARM = ['qi_xie_ling_cao', 'bai_nian_ling_zhi', 'qiannian_lingru'] as const
+
+  interface SimCtx {
+    p: PlayerState
+    g: GatherWorldState
+    rel: NpcRelationsState
+    work: number | undefined
+    rep: number
+    grudge: number
+    events: string[]
+    herbs: number
+  }
+
+  function fresh(): SimCtx {
+    return {
+      p: fromPlayerSave(undefined),
+      g: createGatherWorldState(),
+      rel: createNpcRelationsState(),
+      work: undefined,
+      rep: 0,
+      grudge: 0,
+      events: [],
+      herbs: 0,
+    }
+  }
+
+  function sellAt(ctx: SimCtx, itemId: string): void {
+    ctx.p = sellItem(ctx.p, itemId, bestSellPrice(STOCKS, itemId, ctx.rep))
+  }
+
+  function sellAll(ctx: SimCtx, itemIds: readonly string[]): void {
+    for (const id of itemIds) while ((ctx.p.inventory[id] ?? 0) > 0) sellAt(ctx, id)
+  }
+
+  /** 按优先级采集（rank 高分者优先）：内卷策略在张二盯梢时段优先偷摘被盯的灵草 */
+  function gatherBest(
+    ctx: SimCtx,
+    t: WorldTimeData,
+    rank: (pt: (typeof GATHER_POINTS)[number]) => number,
+  ): boolean {
+    let best: (typeof GATHER_POINTS)[number] | undefined
+    let bestScore = -Infinity
+    for (const pt of GATHER_POINTS) {
+      if (!isGatherAvailable(ctx.g, 'zayiyuan', pt.id, t)) continue
+      const score = rank(pt)
+      if (score <= 0) continue
+      if (score > bestScore) {
+        bestScore = score
+        best = pt
+      }
+    }
+    if (!best) return false
+    return finishGather(ctx, best, t)
+  }
+
+  function finishGather(
+    ctx: SimCtx,
+    pt: (typeof GATHER_POINTS)[number],
+    t: WorldTimeData,
+  ): boolean {
+    ctx.g = gatherAt(ctx.g, 'zayiyuan', pt.id, pt.regen, t)
+    ctx.p = addItem(ctx.p, pt.item, 1)
+    ctx.herbs += 1
+    if (pt.watched && WATCHED.has(t.shichen)) {
+      ctx.rel = bumpRelation(ctx.rel, 'zhang_er', { grudge: GRUDGE_PER_THEFT })
+      ctx.grudge = relationOf(ctx.rel, 'zhang_er').grudge
+    }
+    ctx.work = t.day
+    return true
+  }
+
+  function fightHuiLang(ctx: SimCtx): void {
+    const st = statsForLevel(ctx.p.level)
+    let b = createBattle(enemy, { stats: st, hp: ctx.p.hp, qi: ctx.p.qi }, RNG)
+    let guard = 0
+    while (!b.over && guard++ < 120) b = playerAttack(b, RNG)
+    if (b.win) {
+      ctx.p = syncAfterBattle(ctx.p, b.player.hp, b.player.qi)
+      ctx.p = grantExp(ctx.p, expReward(enemy)).player
+      for (const drop of rollLoot(enemy.loot, RNG)) ctx.p = addItem(ctx.p, drop, 1)
+    } else {
+      ctx.p = respawnPenalty(ctx.p)
+    }
+    if (ctx.p.hp < 20) {
+      const price = applyBuyPrice(12, ctx.rep)
+      if (ctx.p.lingshi >= price) {
+        ctx.p = buyItem(ctx.p, 'huichun_san', price)
+        ctx.p = removeItem(ctx.p, 'huichun_san', 1)
+        ctx.p = { ...ctx.p, hp: Math.min(statsForLevel(ctx.p.level).maxHp, ctx.p.hp + 30) }
+      }
+    }
+  }
+
+  function simulate(
+    name: string,
+    pre: (ctx: SimCtx, t: WorldTimeData) => void,
+    want: (ctx: SimCtx, t: WorldTimeData) => 'idle' | 'gather' | 'fight' | 'craft',
+    rank: (pt: (typeof GATHER_POINTS)[number], t: WorldTimeData) => number = () => 1,
+  ): SimCtx {
+    const ctx = fresh()
+    for (let day = 1; day <= 30; day++) {
+      for (let s = 0; s < 8; s++) {
+        const t: WorldTimeData = { day, shichen: s }
+        pre(ctx, t)
+        const what = want(ctx, t)
+        if (what === 'gather') gatherBest(ctx, t, (pt) => rank(pt, t))
+        else if (what === 'fight') fightHuiLang(ctx)
+        else if (what === 'craft') {
+          if (canCraft(ctx.p, RECIPE)) ctx.p = craft(ctx.p, RECIPE).player
+        }
+      }
+      if (!ctx.events.includes(EVENT.id) && eventTriggered(EVENT, { day, lastWorkDay: ctx.work, relations: ctx.rel })) {
+        const seq = resolveConsequences(EVENT)
+        ctx.p = { ...ctx.p, lingshi: Math.max(0, ctx.p.lingshi + seq.lingshiDelta) }
+        ctx.rep += seq.reputationDelta
+        setReputation(ctx.rep)
+        ctx.events.push(EVENT.id)
+      }
+    }
+    return ctx
+  }
+
+  const noPre = () => {}
+  const results: Array<SimCtx & { name: string }> = []
+
+  // 啃老：赖在屋里睡大觉——不采不战不炼丹，旷工日日累积（记恨为 0，事件差一条腿）
+  results.push({
+    name: '啃老',
+    ...simulate('啃老', noPre, () => 'idle'),
+  })
+
+  // 挖药：药园勤农，全采集点可采即采，全部现卖，只避开张二盯梢时辰（不结记恨，上工记录不断）
+  const avoidWatch = (pt: (typeof GATHER_POINTS)[number], t: WorldTimeData): number =>
+    pt.watched && WATCHED.has(t.shichen) ? -1 : 1
+  results.push({
+    name: '挖药',
+    ...simulate('挖药', (ctx) => sellAll(ctx, YAO_FARM), () => 'gather', avoidWatch),
+  })
+
+  // 抢人：彩霞山灰狼营战士，每时辰一杀；掉落丹药卖出，残血购回春散续命
+  results.push({
+    name: '抢人',
+    ...simulate(
+      '抢人',
+      (ctx) => sellAll(ctx, ['yaodan']),
+      () => 'fight',
+    ),
+  })
+
+  // 炼丹：采药不售，攒三株炼回春散再出坊市（工艺 0 时辰——相对直接卖原料反而亏 3 灵石/炉）
+  results.push({
+    name: '炼丹',
+    ...simulate(
+      '炼丹',
+      (ctx) => {
+        if (canCraft(ctx.p, RECIPE)) ctx.p = craft(ctx.p, RECIPE).player
+        sellAll(ctx, ['huichun_san', 'bai_nian_ling_zhi', 'qiannian_lingru'])
+      },
+      () => 'gather',
+      avoidWatch,
+    ),
+  })
+
+  // 内卷：药园卷王——头 10 天昼夜连轴：非盯梢时辰不碰被盯的灵草（留到卯~巳张二在场时偷摘，记恨+1/次；
+  // 重生周期与时辰相锁，偷摘一次后每逢盯梢时段必可见），攒够家底后第 11 天起躺平（不再上工、不再回流药园）
+  // → 旷工满 7 日 + 记恨 >2 → 第 17~18 日被张二告发「杂役院失窃」
+  results.push({
+    name: '内卷',
+    ...simulate(
+      '内卷',
+      (ctx) => sellAll(ctx, YAO_FARM),
+      (ctx, t) => (t.day <= 10 ? 'gather' : 'idle'),
+      (pt, t) => (pt.watched ? (WATCHED.has(t.shichen) ? 2 : -1) : 1),
+    ),
+  })
+
+  console.log('\n—— V1.6 涌现行为矩阵：5 策略 × 30 日结局分流 ——')
+  for (const o of results) {
+    console.log(
+      `${o.name.padEnd(4)} 等级=${o.p.level} 修为=${o.p.exp} 灵石=${o.p.lingshi} 风评=${o.rep} 记恨=${o.grudge} 采集=${o.herbs} 事件=[${o.events.join(',')}] 持有=[${Object.entries(o.p.inventory)
+        .filter(([, n]) => n > 0)
+        .map(([k, n]) => `${k}x${n}`)
+        .join(' ')}]`,
+    )
+  }
+
+  const fingers = results.map((o) =>
+    [
+      o.p.level,
+      o.p.exp,
+      o.p.lingshi,
+      o.rep,
+      o.grudge,
+      o.events.join(','),
+      o.herbs,
+      o.p.inventory.huichun_san ?? 0,
+      o.p.inventory.qi_xie_ling_cao ?? 0,
+    ].join('|'),
+  )
+  const distinct = new Set(fingers)
+  const juan = results.find((o) => o.name === '内卷')!
+  const grand = results.find((o) => o.name === '抢人')!
+  const nong = results.find((o) => o.name === '挖药')!
+  const alch = results.find((o) => o.name === '炼丹')!
+  check('·V1.6 五种策略结局两两不同', distinct.size === 5, `fingerprints=${distinct.size}`)
+  check('·V1.6 抢人等级全场第一（战斗毕业）', grand.p.level >= 8 && results.every((o) => o.p.level <= grand.p.level), `L${grand.p.level}`)
+  check('·V1.6 啃老躺平：修为仍为 0、无事件', (() => { const k = results.find((o) => o.name === '啃老')!; return k.p.level === 1 && k.p.exp === 0 && k.events.length === 0 && k.p.lingshi === 20 })(), `灵石=${results.find((o) => o.name === '啃老')!.p.lingshi}`)
+  check('·V1.6 炼丹 < 卖原料：药农灵石占优', alch.p.lingshi < nong.p.lingshi && alch.p.inventory.huichun_san === undefined, `炼丹 ${alch.p.lingshi} < 挖药 ${nong.p.lingshi}`)
+  check('·V1.6 内卷被告发：唯一触发失窃', juan.events.length === 1 && juan.events[0] === 'zayiyuan_shiqie' && juan.rep === -20 && juan.grudge >= 3, `事件=${juan.events.join(',')} 风评=${juan.rep} 记恨=${juan.grudge}`)
+  setReputation(0)
 }
 
 console.log(`\nSANDBOX-SIM: ${passed} 项通过, ${failed} 项失败`)
