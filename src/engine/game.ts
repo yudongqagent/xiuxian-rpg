@@ -13,6 +13,11 @@ declare global {
         findPath: (tx: number, ty: number) => Array<[number, number]> | null
         portals: () => Array<{ tile: [number, number]; lockQuest?: string }>
         garden: () => unknown
+        gather: () => {
+          points: Array<{ id: string; x: number; y: number; itemId: string }>
+          availableAt: Record<string, number>
+          now: number
+        }
         navDirect: (tx: number, ty: number) => void
         flags: () => { dialogueOpen: boolean; battleActive: boolean; transitioning: boolean }
         time: { get: () => unknown; advance: (shichen: number) => void }

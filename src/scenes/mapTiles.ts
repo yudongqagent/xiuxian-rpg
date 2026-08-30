@@ -15,6 +15,21 @@ export const PROP_KEYS = {
   stall: 'prop-stall',
 } as const
 
+/** 2.0 采集点贴图键（V1.2）：浅色为底，运行时按产出物着色 */
+export const GATHER_KEYS = {
+  herb: 'gather-herb',
+  ore: 'gather-ore',
+} as const
+
+/** 采集点产出物着色表：itemId → 主色（药材/灵草不同色，矿石冷色），未知默认绿 */
+export const GATHER_TINTS: Record<string, number> = {
+  qi_xie_ling_cao: 0x7bd88f,
+  bai_nian_ling_zhi: 0xc9a86a,
+  zi_hou_hua: 0xc876e8,
+  qiannian_lingru: 0x9fe6f5,
+}
+export const GATHER_TINT_DEFAULT = 0xa8d5a2
+
 const T = 32
 const FRAMES = 7
 
@@ -188,6 +203,47 @@ export function buildProps(scene: Phaser.Scene): void {
     c.fillRect(15, 12, 5, 4)
     c.fillStyle = '#e8b34a'
     c.fillRect(22, 12, 4, 4)
+    tex.refresh()
+  }
+  if (!scene.textures.exists(GATHER_KEYS.herb)) {
+    const tex = scene.textures.createCanvas(GATHER_KEYS.herb, 20, 20)!
+    const c = tex.context as Ctx
+    c.fillStyle = 'rgba(235,255,235,0.92)'
+    c.beginPath()
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2
+      c.ellipse(10 + Math.sin(a) * 5, 10 - Math.cos(a) * 5, 2.2, 5.5, a, 0, Math.PI * 2)
+    }
+    c.fill()
+    c.fillStyle = 'rgba(255,255,255,0.95)'
+    c.beginPath()
+    c.arc(10, 10, 2.6, 0, Math.PI * 2)
+    c.fill()
+    tex.refresh()
+  }
+  if (!scene.textures.exists(GATHER_KEYS.ore)) {
+    const tex = scene.textures.createCanvas(GATHER_KEYS.ore, 22, 18)!
+    const c = tex.context as Ctx
+    const pts = [
+      [4, 12],
+      [9, 4],
+      [17, 6],
+      [19, 13],
+      [12, 16],
+      [5, 15],
+    ] as const
+    c.fillStyle = 'rgba(245,248,255,0.95)'
+    c.beginPath()
+    c.moveTo(pts[0][0], pts[0][1])
+    for (let i = 1; i < pts.length; i++) c.lineTo(pts[i][0], pts[i][1])
+    c.closePath()
+    c.fill()
+    c.strokeStyle = 'rgba(255,255,255,0.9)'
+    c.lineWidth = 1
+    c.beginPath()
+    c.moveTo(9, 4)
+    c.lineTo(12, 16)
+    c.stroke()
     tex.refresh()
   }
 }

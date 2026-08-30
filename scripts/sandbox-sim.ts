@@ -15,6 +15,7 @@ import {
   toWorldSnapshot,
   yearOf,
 } from '../src/systems/time'
+import { gatherAt, isGatherAvailable } from '../src/systems/gather'
 
 let passed = 0
 let failed = 0
@@ -99,6 +100,22 @@ const check = (name: string, ok: boolean, detail = ''): void => {
   check('行走40格=1时辰', tilesToShichen(40) === 1 && tilesToShichen(120) === 3, String(tilesToShichen(120)))
   check('不足40格不结算', tilesToShichen(39) === 0, String(tilesToShichen(39)))
   check('负值钳制为0', tilesToShichen(-5) === 0, String(tilesToShichen(-5)))
+}
+
+// 9. V1.2 采集点：可采判断 / 再生标记 / 跨日再采（纯函数回归）
+{
+  const ws = { byMap: {} }
+  const t = createWorldTime() // 第1日 子时 = 绝对时辰 0
+  const gather = [{ id: 'sp_lingcao', cost: 1, regen: 24, label: '灵草', x: 0, y: 0, itemId: 'qi_xie_ling_cao' }]
+  check('缺省态可采', isGatherAvailable(ws, 'zayiyuan', 'sp_lingcao', t), 'fresh')
+  const after = gatherAt(ws, 'zayiyuan', 'sp_lingcao', 24, t)
+  check('采集后立即不可采', after.byMap.zayiyuan.sp_lingcao === 24 && !isGatherAvailable(after, 'zayiyuan', 'sp_lingcao', t), String(after.byMap.zayiyuan.sp_lingcao))
+  const d1 = { day: 2, shichen: 0 } // 第2日子时（距采集过了 8 时辰），仍不可采
+  check('24时辰再生中（第2日仍被占）', !isGatherAvailable(after, 'zayiyuan', 'sp_lingcao', d1), '24>8')
+  const d4 = { day: 4, shichen: 0 } // 第4日子时（距采集过了 24 时辰）= 可采
+  check('再生到期可采（第4日）', isGatherAvailable(after, 'zayiyuan', 'sp_lingcao', d4), '24<=24')
+  const unaffected = gatherAt(ws, 'qixuanmen', 'other', 5, t)
+  check('不同地图状态互不串扰', unaffected.byMap.zayiyuan === undefined, JSON.stringify(unaffected.byMap))
 }
 
 console.log(`\nSANDBOX-SIM: ${passed} 项通过, ${failed} 项失败`)

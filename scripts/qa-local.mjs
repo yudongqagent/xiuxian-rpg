@@ -424,6 +424,53 @@ try {
       `banner=${bannerText} pos=${endPos?.x},${endPos?.y}`)
   }
 
+  // 8.9 采集点（V1.2）：山村 (2,14) 院门 → 杂役院；走近灵草点按 E 采集 → 物品入包 + 花费时辰 + 该点进入再生
+  {
+    await closeBattle()
+    // 先确认杂役院门在地图可达范围内（qixuanmen 有 portal 到 zayiyuan）——寻路至传送门格 (2,14) 触发送达
+    let onZayiyuan = false
+    for (let i = 0; i < 8 && !onZayiyuan; i++) {
+      await page.evaluate(() => window.__xiuxian?.scene.navDirect(2, 14))
+      await page.waitForTimeout(2000)
+      await closeBattle()
+      const bt = await page.locator('.area-banner').textContent().catch(() => '')
+      onZayiyuan = bt.includes('杂役院')
+    }
+    add('杂役院入口（院门传送）', onZayiyuan, `lastBanner=${(await page.locator('.area-banner').textContent().catch(() => '')).trim()}`)
+    if (onZayiyuan) {
+      // 从 gather() 钩子取第一个采集点，走到其正下方一格再按 E（正下方必须可行走）
+      const target = await page.evaluate(() => {
+        const g = window.__xiuxian?.scene.gather?.()
+        const p = (g?.points ?? [])[0]
+        if (!p) return null
+        return { x: p.x, y: p.y }
+      })
+      if (target) {
+        await page.evaluate((t) => window.__xiuxian?.scene.navDirect(t.x, t.y + 1), target)
+        let reached = false
+        for (let i = 0; i < 25 && !reached; i++) {
+          await page.waitForTimeout(800)
+          const p = await pos()
+          reached = !!p && Math.abs(p.x - target.x) <= 1 && Math.abs(p.y - (target.y + 1)) <= 1
+        }
+        await page.keyboard.down('e'); await page.waitForTimeout(200); await page.keyboard.up('e')
+        await page.waitForTimeout(800)
+        const invAfter = await page.evaluate(() => {
+          const g = window.__xiuxian?.scene.gather?.()
+          return { availableAt: g?.availableAt, now: g?.now, points: g?.points ?? [], mapId: g?.mapId ?? window.__xiuxian?.scene.mapId }
+        })
+        const inBag = await page.evaluate(() => {
+          const g = window.__xiuxian?.scene.gather?.()
+          return g ? Object.values(g.availableAt).some((at) => at > g.now) : false
+        })
+        add('采集点采集（入包+再生标记+时辰消耗）', reached && inBag,
+          `target=${target?.x},${target?.y} reached=${reached} map=${invAfter.mapId} points=${invAfter.points.length} availableAt=${JSON.stringify(invAfter.availableAt)} now=${invAfter.now}`)
+      } else {
+        add('采集点采集（入包+再生标记+时辰消耗）', false, 'no gather points exposed')
+      }
+    }
+  }
+
   // 9. 存档恢复（等自动存档后刷新；若遭遇战斗导致存档跳过则重试一次）
   async function waitStableAndSaved() {
     // 等待战斗结束（若有）

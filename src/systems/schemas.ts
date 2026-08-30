@@ -272,6 +272,22 @@ export const MapPropSchema = z.object({
   y: z.number().int().min(0),
 })
 
+// ==== 2.0 采集点（V1.2，REDESIGN §5.1：采集→炼丹→交易 教学闭环）====
+export const MapGatherPointSchema = z.object({
+  /** 全局唯一点 id（同一图内），用于世界快照记录再生进度 */
+  id: z.string().regex(/^[a-z0-9_]+$/),
+  x: z.number().int().min(0),
+  y: z.number().int().min(0),
+  /** 产出物 id（content/items），须为 material 类 */
+  itemId: z.string().regex(/^[a-z0-9_]+$/),
+  /** 采集消耗时辰（锚：基础 1，珍稀类更贵配更慢再生） */
+  cost: z.number().int().min(1).max(8).default(1),
+  /** 再生周期（时辰），锚 REDESIGN "regen 3日"=24 时辰 */
+  regen: z.number().int().min(1).max(480).default(24),
+  /** 交互提示文案（≤16 字，供 HUD/采集点提示） */
+  label: z.string().min(1).max(16),
+})
+
 export const GameMapSchema = z
   .object({
     id: z.string().regex(/^[a-z0-9_]+$/),
@@ -285,6 +301,8 @@ export const GameMapSchema = z
     npcPlacements: z.array(MapNpcPlacementSchema).max(20).default([]),
     enemySpawns: z.array(MapEnemySpawnSchema).max(20).default([]),
     props: z.array(MapPropSchema).max(40).default([]),
+    /** 2.0 采集点：采集→炼丹→交易 教学闭环（V1.2） */
+    gather: z.array(MapGatherPointSchema).max(24).default([]),
     /** 可选：对应 content/world 区域 id，进入地图时随 area:enter 上报（任务 reach 目标用） */
     regionId: z.string().regex(/^[a-z0-9_]+$/).optional(),
   })
@@ -305,7 +323,7 @@ export const GameMapSchema = z
       }),
     )
     const inBounds = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < m.width && y < m.height
-    ;[m.spawn, ...m.portals.map((p) => ({ x: p.x, y: p.y })), ...m.npcPlacements, ...m.props].forEach((p) => {
+    ;[m.spawn, ...m.portals.map((p) => ({ x: p.x, y: p.y })), ...m.npcPlacements, ...m.props, ...m.gather].forEach((p) => {
       if (!inBounds(p.x, p.y)) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: `坐标 (${p.x},${p.y}) 越界` })
       }
@@ -313,6 +331,7 @@ export const GameMapSchema = z
   })
 
 export type MapPortal = z.infer<typeof MapPortalSchema>
+export type MapGatherPoint = z.infer<typeof MapGatherPointSchema>
 export type GameMap = z.infer<typeof GameMapSchema>
 
 export type Item = z.infer<typeof ItemSchema>

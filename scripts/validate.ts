@@ -54,6 +54,7 @@ interface RawMap {
   npcPlacements: Array<{ npcId: string; x: number; y: number }>
   enemySpawns: Array<{ enemyId: string; x: number; y: number }>
   props?: Array<{ type: string; x: number; y: number }>
+  gather?: Array<{ id: string; x: number; y: number; itemId: string; cost: number; regen: number; label: string }>
   regionId?: string
 }
 
@@ -145,6 +146,7 @@ function checkRefs() {
       ...m.portals.map((p) => ['传送点', p.x, p.y] as const),
       ...m.npcPlacements.map((n) => [`NPC ${n.npcId}`, n.x, n.y] as const),
       ...m.enemySpawns.map((e) => [`妖兽 ${e.enemyId}`, e.x, e.y] as const),
+      ...(m.gather ?? []).map((g) => [`采集点 ${g.id}`, g.x, g.y] as const),
     ]
     for (const [label, x, y] of spots) {
       if (!tileWalkable(m.rows, x, y)) {
@@ -176,6 +178,9 @@ function checkRefs() {
         errors++
         console.error(`✗ [地图] ${mid} 的道具 ${p.type} 落在不可行走格 (${p.x},${p.y})`)
       }
+    }
+    for (const g of m.gather ?? []) {
+      if (!itemIds.has(g.itemId)) refErr(`地图 ${mid} 采集点 ${g.id}`, '产出物', g.itemId)
     }
   }
   for (const enemy of readAll('enemies')) {

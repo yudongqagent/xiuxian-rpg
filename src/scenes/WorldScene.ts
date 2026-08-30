@@ -3,12 +3,22 @@ import { bus } from '../engine/eventBus'
 import { AUTO_SLOT, loadSave, writeSave, type SlotId } from '../engine/save'
 import { DEFAULT_MAP_ID, getAllMaps, getGameMap, isWalkable } from '../systems/maps'
 import { getNavRoute, portalPath, setNavRoute } from '../systems/nav'
-import type { GameMap } from '../systems/schemas'
+import type { GameMap, MapGatherPoint } from '../systems/schemas'
+// 2.0 采集点：采集→炼丹→交易 教学闭环（V1.2）
+import {
+  absoluteShichen,
+  createGatherWorldState,
+  gatherAt,
+  gatherPointById,
+  isGatherAvailable,
+  type GatherWorldState,
+} from '../systems/gather'
 
 type PortalTarget = GameMap['portals'][number]['to']
-import { FRAME, HOUSE_KEY, MAP_ATLAS_KEY, buildMapTileTextures } from './mapTiles'
+import { FRAME, HOUSE_KEY, MAP_ATLAS_KEY, GATHER_KEYS, GATHER_TINTS, GATHER_TINT_DEFAULT, buildMapTileTextures } from './mapTiles'
 // combat-depth：成长/背包状态恢复与战败惩罚
 import {
+  addItem,
   fromPlayerSave,
   getPlayer,
   meditateTick,
@@ -130,6 +140,10 @@ export class WorldScene extends Phaser.Scene {
   private knockbackUntil = 0
   /** 2.0 时间成本：累积移动像素，跨整格结算时辰（V1.1） */
   private moveTimeAccum = 0
+  /** 2.0 采集点世界状态（V1.2）：再生进度全局共享，随 world 快照入档 */
+  private gatherWorld: GatherWorldState = createGatherWorldState()
+  /** 当前地图渲染的采集点精灵（含 id/位置/出生状态） */
+  private gatherSprites: Phaser.GameObjects.Image[] = []
   private meditating = false
   private meditateMult = 1
   private meditateTickNo = 0
@@ -223,6 +237,7 @@ export class WorldScene extends Phaser.Scene {
     )
     bakeTerrainBlend(this, this.gameMap)
     const { lanternLights } = placeProps(this, this.gameMap)
+    this.placeGatherPoints()
     addFlowingWater(this, this.gameMap)
     attachWeather(this, this.mapId)
     attachDayNight(this, atmosphere.grade)
@@ -267,6 +282,10 @@ export class WorldScene extends Phaser.Scene {
     restoreQuests(save?.quests)
     // 2.0 时间轴：恢复世界时刻（旧档缺省按开局第一天）
     setWorldTime(fromWorldSnapshot(save?.world))
+    // 2.0 采集点：恢复再生进度（旧档缺省全图可采；跨图不丢失）
+    this.gatherWorld = {
+      byMap: save?.world?.gather ? { ...save.world.gather } : {},
+    }
 
     // 2.0 时间轴：真实时间驱动世界时刻（1 时辰 ≈ 60s 现实），期间事件队列至 V2
     let clockMs = 0
@@ -317,6 +336,12 @@ export class WorldScene extends Phaser.Scene {
           lockQuest: z.lockQuest,
         })),
       garden: () => getPlayer().garden,
+      gather: () => ({
+        mapId: this.mapId,
+        points: this.gameMap.gather?.map((g) => ({ id: g.id, x: g.x, y: g.y, itemId: g.itemId })) ?? [],
+        availableAt: this.gatherWorld.byMap[this.mapId] ?? {},
+        now: absoluteShichen(getWorldTime()),
+      }),
       navDirect: (tx: number, ty: number) => this.startAutoPathTo(tx, ty),
       time: {
         get: () => getWorldTime(),
@@ -830,6 +855,8 @@ export class WorldScene extends Phaser.Scene {
       bus.on('save:load', ({ slot }) => void this.loadFromSlot(slot as SlotId)),
       bus.on('battle:opened', () => (this.battleAcked = true)),
       bus.on('meditate:toggle', () => this.toggleMeditate()),
+      // 2.0 时间轴（V1.2）：世界时刻推进后刷新采集点可采外观（再生到期自动亮起）
+      bus.on('time:state', () => this.gatherSprites.forEach((s) => this.refreshGatherSprite(s))),
       bus.on('navigate:quest', () => this.navigateToObjective()),
       bus.on('navigate:tile', ({ x, y }) => {
         setNavRoute(null)
@@ -900,9 +927,16 @@ export class WorldScene extends Phaser.Scene {
       return
     }
     const near = this.nearestNpc()
-    if (near) {
-      this.prompt.setPosition(near.sprite.x, near.sprite.y - TILE).setVisible(true)
+    const nearGather = this.nearestGatherPoint()
+    if (near && (!nearGather || Phaser.Math.Distance.Between(this.player.x, this.player.y, near.sprite.x, near.sprite.y) <= nearGather.dist)) {
+      this.prompt.setPosition(near.sprite.x, near.sprite.y - TILE).setVisible(true).setText('[E] 交谈')
       if (Phaser.Input.Keyboard.JustDown(this.interactKey)) this.tryInteract()
+    } else if (nearGather && nearGather.available) {
+      this.prompt
+        .setPosition(nearGather.sprite.x, nearGather.sprite.y - TILE)
+        .setVisible(true)
+        .setText(`[E] 采集 · ${nearGather.sprite.data.get('label')}`)
+      if (Phaser.Input.Keyboard.JustDown(this.interactKey)) this.tryGather()
     } else {
       this.prompt.setVisible(false)
     }
@@ -982,6 +1016,78 @@ export class WorldScene extends Phaser.Scene {
     return best
   }
 
+  /** 2.0 采集点（V1.2）：当前地图最近且可交互的采集点（可用性随世界时刻判定） */
+  private nearestGatherPoint(): { sprite: Phaser.GameObjects.Image; dist: number; available: boolean } | null {
+    let best: Phaser.GameObjects.Image | null = null
+    let bestDist = INTERACT_RANGE
+    for (const spr of this.gatherSprites) {
+      if (!spr.visible) continue
+      const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, spr.x, spr.y)
+      if (d < bestDist) {
+        bestDist = d
+        best = spr
+      }
+    }
+    if (!best) return null
+    const point = gatherPointById(this.gameMap, best.data.get('pointId') as string)
+    const available = isGatherAvailable(this.gatherWorld, this.mapId, best.data.get('pointId') as string, getWorldTime())
+    return { sprite: best, dist: bestDist, available }
+  }
+
+  /** 2.0 采集点渲染（V1.2）：精灵着色区分产出物；再生中变灰并收拢 */
+  private placeGatherPoints(): void {
+    this.gatherSprites.forEach((s) => s.destroy())
+    this.gatherSprites = []
+    for (const g of this.gameMap.gather ?? []) {
+      const px = g.x * TILE + TILE / 2
+      const py = g.y * TILE + TILE / 2
+      const key: 'herb' | 'ore' = g.itemId === 'qiannian_lingru' ? 'ore' : 'herb'
+      const tint = GATHER_TINTS[g.itemId] ?? GATHER_TINT_DEFAULT
+      const spr = this.add
+        .image(px, py, GATHER_KEYS[key])
+        .setDepth(3.1)
+        .setTint(tint)
+        .setData({ pointId: g.id, label: g.label, itemId: g.itemId })
+      this.gatherSprites.push(spr)
+      this.refreshGatherSprite(spr)
+    }
+  }
+
+  /** 刷新单个采集点外观：按世界时刻是否到期切换明暗 */
+  private refreshGatherSprite(spr: Phaser.GameObjects.Image): void {
+    const pointId = spr.data.get('pointId') as string
+    const avail = isGatherAvailable(this.gatherWorld, this.mapId, pointId, getWorldTime())
+    if (avail) spr.setAlpha(1).setScale(1)
+    else spr.setAlpha(0.35).setScale(0.85)
+  }
+
+  /** 2.0 采集动作（V1.2）：消耗时辰 + 产出物入包 + 标记再生周期 */
+  private tryGather(): void {
+    if (this.transitioning || this.battleActive || this.dialogueOpen) return
+    const near = this.nearestGatherPoint()
+    if (!near || !near.available) return
+    const g = gatherPointById(this.gameMap, near.sprite.data.get('pointId') as string)
+    if (!g) return
+    // 采集消耗时辰（推进世界时刻并刷新 HUD）
+    this.spendTime(g.cost)
+    // 产出入包
+    const next = addItem(getPlayer(), g.itemId, 1)
+    setPlayer(next)
+    bus.emit('item:acquired', { itemId: g.itemId, count: 1 })
+    bus.emit('quest:notify', { text: `采集「${g.label}」 +1`, kind: 'success' })
+    bus.emit('player:stats')
+    // 标记再生
+    this.gatherWorld = gatherAt(this.gatherWorld, this.mapId, g.id, g.regen, getWorldTime())
+    this.refreshGatherSprite(near.sprite)
+    // 采集反馈：一瞬鼓点（零资源，纯 tween 缩放）
+    this.tweens.add({
+      targets: near.sprite,
+      scale: { from: 1.3, to: 0.85 },
+      duration: 220,
+      ease: 'Quad.easeOut',
+    })
+  }
+
   private snapshotSave() {
     return {
       version: SAVE_VERSION,
@@ -993,7 +1099,11 @@ export class WorldScene extends Phaser.Scene {
       savedAt: Date.now(),
       player: toPlayerSave(getPlayer()),
       quests: snapshotQuests(),
-      world: toWorldSnapshot(getWorldTime()),
+      world: {
+        ...toWorldSnapshot(getWorldTime()),
+        // 2.0 采集点再生进度（V1.2）随世界快照入档
+        gather: this.gatherWorld.byMap,
+      },
     }
   }
 

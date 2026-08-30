@@ -1,0 +1,94 @@
+{
+  "id": "zayiyuan",
+  "name": "杂役院",
+  "width": 30,
+  "height": 22,
+  "rows": [
+    "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
+    "T....T......T......T.........T",
+    "TF...TF.....TF.....T.........T",
+    "T....T...HHHT......T.........T",
+    "TF...TF.....TF.....T.........T",
+    "T....T......TF.....T.........T",
+    "TF...TF.....T......T.........T",
+    "T....T......TF.....T.........T",
+    "T....TF.....T......T.........T",
+    "T,,,,,,,,,,,,,,,,,,,,,,,,,,,,T",
+    "T,,,,,,,,,,,,,,,,,,,,,,,,,,,,T",
+    "T........F...................T",
+    "T.......F....F...............T",
+    "T.................F..........T",
+    "T......F....F................T",
+    "T...............F............T",
+    "T..........F.......F.........T",
+    "T..........F.................T",
+    "T,,,,,,,,,,,,,,,,,,,,,,,,,,,,T",
+    "T........DDD.................T",
+    "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
+    "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTT"
+  ],
+  "spawn": {
+    "x": 5,
+    "y": 19
+  },
+  "portals": [
+    {
+      "x": 9,
+      "y": 19,
+      "to": {
+        "map": "qixuanmen",
+        "x": 4,
+        "y": 14
+      },
+      "label": "北·山村"
+    }
+  ],
+  "npcPlacements": [],
+  "enemySpawns": [],
+  "props": [
+    {
+      "type": "signpost",
+      "x": 25,
+      "y": 4
+    }
+  ],
+  "gather": [
+    {
+      "id": "sp_lingcao_a",
+      "x": 7,
+      "y": 2,
+      "itemId": "qi_xie_ling_cao",
+      "cost": 1,
+      "regen": 24,
+      "label": "七叶灵草"
+    },
+    {
+      "id": "sp_lingcao_b",
+      "x": 22,
+      "y": 6,
+      "itemId": "qi_xie_ling_cao",
+      "cost": 1,
+      "regen": 24,
+      "label": "七叶灵草"
+    },
+    {
+      "id": "sp_lingru",
+      "x": 23,
+      "y": 13,
+      "itemId": "qiannian_lingru",
+      "cost": 3,
+      "regen": 72,
+      "label": "千年灵乳"
+    },
+    {
+      "id": "sp_lingzhi",
+      "x": 9,
+      "y": 16,
+      "itemId": "bai_nian_ling_zhi",
+      "cost": 2,
+      "regen": 48,
+      "label": "百年灵芝"
+    }
+  ],
+  "regionId": "qixuan_men"
+}

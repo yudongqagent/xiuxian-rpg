@@ -25,6 +25,8 @@ export interface WorldTimeData {
 export interface WorldSnapshot {
   /** 世界时间轴 */
   time: WorldTimeData
+  /** 2.0 采集点再生进度（V1.2）：mapId → pointId → 下次可采绝对时辰；缺省整图为可采 */
+  gather?: Record<string, Record<string, number>>
   // V2 扩：npcStates / eventQueue / regionStates / seenHints / fog
 }
 
