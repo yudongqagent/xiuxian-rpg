@@ -121,6 +121,15 @@ export const RegionSchema = z.object({
   adjacent: z.array(z.string()).default([]),
   /** 灵气浓度（打坐恢复倍率）：凡人聚居 1.0，灵山 2.0，洞府灵脉最高 3.0 */
   qiDensity: z.number().min(0.5).max(3).default(1),
+  /** 危险度带（V2.3，REDESIGN §5.1/§6.3）：软护栏——不锁门，靠「信息差传闻 + 战败送回安全区」引导；缺省 = 安全区 */
+  danger: z
+    .object({
+      /** 坊间传闻（首次进入的软拦提示文案：妖兽线索/幸存者告诫） */
+      intel: z.string().min(1).max(80),
+      /** 建议最低境界层数（玩家 level 低于此值 → 入场传闻警示 once + 战败被抬回安全区） */
+      levelMin: z.number().int().min(1).max(99),
+    })
+    .optional(),
 })
 
 export const DialogueChoiceSchema = z.object({
@@ -344,9 +353,7 @@ export const MapPortalSchema = z.object({
     y: z.number().int().min(0),
   }),
   label: z.string().min(1).max(12),
-  /** 章节锁：需已完成的主线任务 id，未完成则禁止穿越并提示 */
-  lockQuest: z.string().regex(/^[a-z0-9_]+$/).optional(),
-  lockHint: z.string().max(40).optional(),
+  // V2.3 章节锁已删（全图可达，改危险度带软拦）：lockQuest/lockHint 不得再出现在地图传送点上
 })
 
 export const MapNpcPlacementSchema = z.object({

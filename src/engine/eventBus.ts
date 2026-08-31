@@ -29,7 +29,7 @@ type GameEvents = {
   /** 任务状态迁移通知 */
   'quest:updated': { questId: string; status: QuestStatus }
   /** 任务提示 toast */
-  'quest:notify': { text: string; kind?: 'info' | 'success' }
+  'quest:notify': { text: string; kind?: 'info' | 'success' | 'danger' }
   /** 接取任务请求 */
   'quest:offer': { questId: string }
   /** 交付任务请求 */

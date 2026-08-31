@@ -3,7 +3,6 @@
  * 路线 = 传送门链 + 最终目标图块；世界层逐段行走，跨图后由 create() 续航。
  */
 import { getAllMaps, getGameMap } from './maps'
-import { isQuestCompleted } from './questRuntime'
 
 export interface NavHop {
   fromMapId: string
@@ -29,12 +28,10 @@ export function setNavRoute(r: NavRoute | null): void {
   route = r
 }
 
-/** 传送门是否可通行（章节锁） */
-export function portalOpen(lockQuest: string | undefined): boolean {
-  return !lockQuest || isQuestCompleted(lockQuest)
-}
-
-/** 跨地图 BFS：返回从 fromMap 到 toMap 的传送门链；不可达返回 null */
+/**
+ * 跨地图 BFS：返回从 fromMap 到 toMap 的传送门链；不可达返回 null。
+ * V2.3 全图可达：章节锁已删，portal 恒可通行。
+ */
 export function portalPath(fromMapId: string, toMapId: string): NavHop[] | null {
   if (fromMapId === toMapId) return []
   const maps = getAllMaps()
@@ -45,7 +42,6 @@ export function portalPath(fromMapId: string, toMapId: string): NavHop[] | null 
     const cur = queue.shift()!
     const curMap = getGameMap(cur)
     for (const p of curMap.portals) {
-      if (!portalOpen(p.lockQuest)) continue
       const next = p.to.map
       if (seen.has(next)) continue
       const hop: NavHop = { fromMapId: cur, portal: { x: p.x, y: p.y }, toMapId: next }

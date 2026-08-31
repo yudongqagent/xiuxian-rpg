@@ -9,5 +9,9 @@
     "yuejiang_zhanchang",
     "yuanwu_guo"
   ],
-  "qiDensity": 2.5
+  "qiDensity": 2.5,
+  "danger": {
+    "intel": "百药园外的灰狼营近日拦路劫财——有猎户抬回来时只剩半条命，郎中连连摆手：至少炼气中期，莫往枫林深处走。",
+    "levelMin": 9
+  }
 }

@@ -7,5 +7,9 @@
     "huangfeng_gu",
     "shanggu_dongfu"
   ],
-  "qiDensity": 1.5
+  "qiDensity": 1.5,
+  "danger": {
+    "intel": "残城里逃出的兵卒瘫在路边：魔修见活物就砍，联军连自家后撤的都顾不上——筑基以下的，军功是狼嘴里的肉。",
+    "levelMin": 15
+  }
 }

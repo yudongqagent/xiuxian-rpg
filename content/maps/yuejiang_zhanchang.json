@@ -56,9 +56,7 @@
         "x": 15,
         "y": 27
       },
-      "label": "北·上古洞府",
-      "lockQuest": "qm_05_zhengmo_zhanyi",
-      "lockHint": "第五章·正魔之战 完成后方可探府"
+      "label": "北·上古洞府"
     }
   ],
   "npcPlacements": [

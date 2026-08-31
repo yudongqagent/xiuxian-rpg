@@ -43,6 +43,8 @@ export interface WorldSnapshot {
   npcs?: Record<string, { bornDay: number; level: number }>
   /** NPC 坐化登记（V2.2）：已陨落 NPC（once 防重复，重载不重播） */
   npcPassed?: string[]
+  /** 危险度带（V2.3）：已展示过入场传闻的区域（once 软拦，重载不重复警告） */
+  seenWarnings?: string[]
   // V2 扩：eventQueue / regionStates / seenHints / fog
 }
 

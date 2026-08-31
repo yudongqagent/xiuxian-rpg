@@ -165,4 +165,23 @@
 
 ---
 
+## V2.3 危险度带（2026-08-31 · DEVELOPMENT_PROCESS §6.3 · v2.3-dangerzone）
+
+**不锁门，告诉你哪条路会死**：章节锁全删、全图可达，改用信息差传闻软拦 + 战败送回安全区。
+
+- **全图可达（删锁）**：移除所有 portal `lockQuest/lockHint` 字段（huangfeng_gu/shanji/yuejiang_zhanchang 共 5 处），validate 新增「传送点无章节锁残留」断言；BFS 全图可达；山河图面板重写（危险区红框标注建议境界层数，文案改「山川全图通行，越界凶险自知」）
+- **信息差软拦**：RegionSchema 加 `danger?: { intel, levelMin }`；首次踏入危险区（玩家 level < levelMin）弹坊间传闻 toast（红边 danger 款），`seenWarnings` once 入档不重复
+- **战败送回安全区**：危险区战败 → 气血折半 + 先落盘再 `scene.restart` 七玄门山村(18,22)，弹「被路过的义士抬回了山村」；安全区战败仅原地传送（旧逻辑不变）。新增 `battle.lose` debug 钩子确定性回归
+- **危险区投放**（6 个 region）：彩霞山脉(4) / 黄枫谷(9) / 太南山(12) / 血色试炼塔(13) / 越疆战场(15) / 上古洞府(18)；七玄门山村/杂役院为安全区
+- **quest:notify danger 类型**：eventBus/QuestToast/audio 新增 `danger` kind（红边 toast + 小受伤音效）
+
+**门禁**：validate ✓（含章节锁残留扫描） build ✓ sandbox-sim 99/99 ✓ combat ✓ quest 52/52 qa-local 51/51（8.5 门户全开 + 危险传闻 once + 8.99 战败抬回山村 + 气血折半持久）
+
+**试玩具体观察四（playtest-observation）**：
+> 全图可达金线：山道→黄枫谷→血色试炼塔→越疆战场→上古洞府一路无阻，每进一个危险区都弹出红边传闻（「百药园外的灰狼营近日拦路劫财……」），像在读一份江湖通缉令；
+> 故意在山道送死后，屏幕一黑就被抬回七玄门山村——气血折半、寿元照走（世界历不受战败影响），死亡是一次轻量的信息获取，而不是进度倒退。
+> 玩家感知到：世界不怕你看，怕你不知道自己几斤几两。
+
+---
+
 *每次完成阶段性工作请更新本文档。*

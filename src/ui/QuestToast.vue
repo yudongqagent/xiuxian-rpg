@@ -5,7 +5,7 @@ import { bus } from '../engine/eventBus'
 interface ToastItem {
   id: number
   text: string
-  kind: 'info' | 'success'
+  kind: 'info' | 'success' | 'danger'
 }
 
 const TOAST_LIFETIME_MS = 3200
@@ -66,6 +66,10 @@ onUnmounted(() => {
 .toast.success {
   border-color: #7ec8a9;
   color: #cfe8b5;
+}
+.toast.danger {
+  border-color: #a03c2d;
+  color: #f3b7a0;
 }
 .toast-enter-active,
 .toast-leave-active {

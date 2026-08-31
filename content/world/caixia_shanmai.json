@@ -7,5 +7,9 @@
     "qixuan_men",
     "luoyun_fangshi"
   ],
-  "qiDensity": 1.5
+  "qiDensity": 1.5,
+  "danger": {
+    "intel": "进山前樵夫拦下你：灰狼帮把持北麓猎场，猎户的背篓连着人一起抬出来——没到炼气三层的，别往林子里钻。",
+    "levelMin": 4
+  }
 }

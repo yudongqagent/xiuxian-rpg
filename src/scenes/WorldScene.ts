@@ -30,7 +30,7 @@ import {
   toPlayerSave,
   updatePlayer,
 } from '../systems/player'
-import { enemiesDropping, npcCultivateFor, npcCultivateIds, npcLikesFor, npcProbeFor, npcScheduleFor, npcWatchRadiusFor, regionQiDensity, resolveName } from '../systems/contentNames'
+import { enemiesDropping, npcCultivateFor, npcCultivateIds, npcLikesFor, npcProbeFor, npcScheduleFor, npcWatchRadiusFor, regionDanger, regionQiDensity, resolveName } from '../systems/contentNames'
 import { ITEMS } from '../systems/itemBook'
 // 2.0 关系图 → 恩仇系统：好感/记恨写回 + 恩仇类型 + 送礼 + 日程查表（V1.3 / V2.1）
 import {
@@ -84,7 +84,6 @@ import {
 // quest-engine：任务进度恢复与入档
 import {
   getTrackedTarget,
-  isQuestCompleted,
   restoreQuests,
   snapshotQuests,
   type TrackedTarget,
@@ -126,7 +125,6 @@ const FADE_MS = 350
 const SAVE_VERSION = 2
 const BATTLE_ACK_WATCHDOG_MS = 1500
 const MEDITATE_TICK_MS = 2000
-const LOCK_TOAST_COOLDOWN_MS = 1500
 const ENEMY_RESPAWN_MS = 30000
 const WAYPOINT_ARRIVAL_PX = 10
 // ==== 2.0 时间成本（V1.1，REDESIGN §6.1：移动/战斗/传送消耗时辰）====
@@ -183,10 +181,9 @@ export class WorldScene extends Phaser.Scene {
   private portalZones: Array<{
     zone: Phaser.GameObjects.Zone
     to: PortalTarget
-    lockQuest?: string
-    lockHint?: string
   }> = []
-  private lockToastUntil = 0
+  /** V2.3 危险度带：已展示过入场传闻的区域 id（once 软拦，随 world 快照入档） */
+  private seenWarnings: string[] = []
   private autoPath: Phaser.Math.Vector2[] = []
   private obstacles!: Phaser.Physics.Arcade.StaticGroup
   private ready = false
@@ -355,6 +352,8 @@ export class WorldScene extends Phaser.Scene {
     // 2.0 NPC 生命周期（V2.2）：恢复 NPC 修炼进度/坐化登记（旧档缺省空）
     this.npcLife = save?.world?.npcs ? { ...save.world.npcs } : {}
     this.npcPassed = [...(save?.world?.npcPassed ?? [])]
+    // 2.0 危险度带（V2.3）：恢复入场传闻展示记录（once 软拦）
+    this.seenWarnings = [...(save?.world?.seenWarnings ?? [])]
     // 2.0 寿元（V1.5）：恢复大境界硬锁/此世终结（寿元推进由世界历驱动，存日即可推算年龄）
     setAging({
       lockedRealms: save?.world?.aging?.lockedRealms ?? [],
@@ -397,6 +396,7 @@ export class WorldScene extends Phaser.Scene {
 
     this.cameras.main.fadeIn(FADE_MS, 0, 0, 0)
     bus.emit('area:enter', { name: this.gameMap.name, regionId: this.gameMap.regionId })
+    this.warnDangerEnter()
     this.ready = true
     this.resumeNavRoute()
     const qa = (window.__xiuxian ??= { bus })
@@ -408,7 +408,6 @@ export class WorldScene extends Phaser.Scene {
       portals: () =>
         this.portalZones.map((z) => ({
           tile: [Math.round(z.zone.x / TILE), Math.round(z.zone.y / TILE)],
-          lockQuest: z.lockQuest,
         })),
       garden: () => getPlayer().garden,
       gather: () => ({
@@ -438,6 +437,7 @@ export class WorldScene extends Phaser.Scene {
           absentDays: absentWorkDays(this.labor.lastWorkDay, getWorldTime().day),
           aging: getAging(),
           npcPassed: [...this.npcPassed],
+          seenWarnings: [...this.seenWarnings],
           _now: getWorldTime(),
         }),
       // 2.0 NPC 生命周期（V2.2）：打探文本 / 洞察（修炼层数+坐化大限年）＝ qa-local 确定性回归钩子
@@ -475,6 +475,7 @@ export class WorldScene extends Phaser.Scene {
         battleActive: this.battleActive,
         transitioning: this.transitioning,
       }),
+      'battle.lose': () => this.onBattleDefeat(),
     }
     bus.emit('map:minimap', {
       rows: this.gameMap.rows,
@@ -483,7 +484,7 @@ export class WorldScene extends Phaser.Scene {
       portals: this.gameMap.portals.map((p) => ({
         x: p.x,
         y: p.y,
-        locked: Boolean(p.lockQuest && !isQuestCompleted(p.lockQuest)),
+        locked: false,
       })),
     })
 
@@ -564,20 +565,20 @@ export class WorldScene extends Phaser.Scene {
     )
   }
 
-  /** 传送门：踏入后淡出 → restart 携带目标地图与落点；章节锁未解锁则提示并拦下 */
+  /** 传送门：踏入后淡出 → restart 携带目标地图与落点（V2.3 全图可达，仅标注固定名字） */
   private placePortals(): void {
     this.portalZones = this.gameMap.portals.map((p) => {
       const zone = this.add.zone(p.x * TILE + TILE / 2, p.y * TILE + TILE / 2, TILE, TILE)
       this.physics.add.existing(zone, true)
       this.add
-        .text(zone.x, zone.y - TILE, p.lockQuest ? `🔒${p.label}` : p.label, {
+        .text(zone.x, zone.y - TILE, p.label, {
           fontSize: '11px',
-          color: p.lockQuest ? '#c9b18a' : '#bff3e8',
+          color: '#bff3e8',
           backgroundColor: 'rgba(26,18,11,0.7)',
           padding: { x: 4, y: 2 },
         })
         .setOrigin(0.5)
-      return { zone, to: p.to, lockQuest: p.lockQuest, lockHint: p.lockHint }
+      return { zone, to: p.to }
     })
   }
 
@@ -850,17 +851,6 @@ export class WorldScene extends Phaser.Scene {
       if (this.transitioning || this.battleActive) return
       const hit = this.portalZones.find((z) => z.zone === zObj)
       if (!hit) return
-      if (hit.lockQuest && !isQuestCompleted(hit.lockQuest)) {
-        if (this.time.now > this.lockToastUntil) {
-          this.lockToastUntil = this.time.now + LOCK_TOAST_COOLDOWN_MS
-          bus.emit('quest:notify', { text: hit.lockHint ?? '此路尚未开启', kind: 'info' })
-        }
-        const last = this.autoPath[this.autoPath.length - 1]
-        if (!last || (Math.abs(last.x - hit.zone.x) < TILE && Math.abs(last.y - hit.zone.y) < TILE)) {
-          this.autoPath = []
-        }
-        return
-      }
       this.transitionTo(hit.to)
     })
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
@@ -949,14 +939,13 @@ export class WorldScene extends Phaser.Scene {
     return path
   }
 
-  /** autoPath 结束后手动检测是否停在传送门上（补偿 overlap 不触发的情况） */
+  /** autoPath 结束后手动检测是否停在传送门上（补偿 overlap 不触发的情况；V2.3 全图可达） */
   private checkPortalProximity(): void {
     if (this.transitioning || this.battleActive) return
     const px = this.player.x
     const py = this.player.y
     for (const p of this.portalZones) {
       if (Math.abs(px - p.zone.x) < TILE / 2 && Math.abs(py - p.zone.y) < TILE / 2) {
-        if (p.lockQuest && !isQuestCompleted(p.lockQuest)) return
         this.transitionTo(p.to)
         return
       }
@@ -1072,16 +1061,42 @@ export class WorldScene extends Phaser.Scene {
             ;(enemy.body as Phaser.Physics.Arcade.Body).setVelocity(-dir.x * 60, -dir.y * 60)
           }
           if (!fled) {
-            // 战败（非逃跑）：宽惩罚——气血折半，送回出生点
-            updatePlayer(respawnPenalty)
-            bus.emit('player:stats')
-            this.player.setPosition(this.spawnPoint.x, this.spawnPoint.y)
+            // 战败（非逃跑）：宽惩罚——气血折半；危险区战败被抬回安全区山村（V2.3 软护栏，寿元走世界历不受影响）
+            this.onBattleDefeat()
           }
           this.joyVec = { x: 0, y: 0 }
         }
         this.activeEnemy = undefined
       }),
     )
+  }
+
+  /** V2.3 战败结算：危险区 → 送回全局安全区（七玄门山村）并提示；安全区 → 送回本图出生点 */
+  private async onBattleDefeat(): Promise<void> {
+    updatePlayer(respawnPenalty)
+    bus.emit('player:stats')
+    const danger = regionDanger(this.gameMap.regionId)
+    if (danger) {
+      bus.emit('quest:notify', { text: '眼前一黑……被路过的义士抬回了山村。', kind: 'info' })
+      const safe = getGameMap(DEFAULT_MAP_ID)
+      // 先落盘（含气血折半的当场状态），restart 后从 auto 档恢复，惩罚才不丢
+      await writeSave(this.snapshotSave(), AUTO_SLOT)
+      this.scene.restart({ mapId: DEFAULT_MAP_ID, x: safe.spawn.x, y: safe.spawn.y })
+      return
+    }
+    this.player.setPosition(this.spawnPoint.x, this.spawnPoint.y)
+  }
+
+  /** V2.3 危险度带软拦：首次踏入危险区（境界不足）弹出坊间传闻警示，once 入档 */
+  private warnDangerEnter(): void {
+    const regId = this.gameMap.regionId
+    const danger = regionDanger(regId)
+    if (!regId || !danger || this.seenWarnings.includes(regId)) return
+    const level = getPlayer().level
+    if (level < danger.levelMin) {
+      this.seenWarnings.push(regId)
+      bus.emit('quest:notify', { text: danger.intel, kind: 'danger' })
+    }
   }
 
   update(): void {
@@ -1382,6 +1397,8 @@ export class WorldScene extends Phaser.Scene {
         // 2.0 NPC 生命周期（V2.2）：NPC 修炼进度 + 坐化登记随世界快照入档（once 防重复）
         npcs: this.npcLife,
         npcPassed: [...this.npcPassed],
+        // 2.0 危险度带（V2.3）：入场传闻展示记录随世界快照入档（once 软拦）
+        seenWarnings: [...this.seenWarnings],
       },
     }
   }

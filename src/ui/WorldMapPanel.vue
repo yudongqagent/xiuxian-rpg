@@ -2,26 +2,15 @@
 import { computed, onUnmounted, ref } from 'vue'
 import { bus } from '../engine/eventBus'
 import { getAllMaps, getGameMap } from '../systems/maps'
-import { isQuestCompleted } from '../systems/questRuntime'
-import { resolveName } from '../systems/contentNames'
-import { getQuest } from '../systems/questContent'
+import { regionDanger, resolveName } from '../systems/contentNames'
 
 const emit = defineEmits<{ close: [] }>()
 
 interface Row {
   mapId: string
   name: string
-  status: 'here' | 'open' | 'locked'
-  lockHint: string
-}
-
-function lockOf(mapId: string): string | null {
-  for (const m of getAllMaps()) {
-    for (const p of m.portals) {
-      if (p.to.map === mapId && p.lockQuest && !isQuestCompleted(p.lockQuest)) return p.lockHint ?? '主线推进后开放'
-    }
-  }
-  return null
+  status: 'here' | 'open' | 'atrisk'
+  hint: string
 }
 
 const currentMap = ref(getGameMap('').id)
@@ -33,12 +22,12 @@ onUnmounted(() => unArea())
 
 const rows = computed<Row[]>(() =>
   getAllMaps().map((m) => {
-    const lock = lockOf(m.id)
+    const danger = regionDanger(m.regionId)
     return {
       mapId: m.id,
       name: m.regionId ? resolveName('region', m.regionId) : m.name,
-      status: m.id === currentMap.value ? 'here' : lock ? 'locked' : 'open',
-      lockHint: lock ?? '',
+      status: m.id === currentMap.value ? 'here' : danger ? 'atrisk' : 'open',
+      hint: danger ? `险地·${danger.levelMin}层起` : '',
     }
   }),
 )
@@ -51,13 +40,13 @@ const rows = computed<Row[]>(() =>
         <span class="title">山河图 · 人界·越国</span>
         <button class="close ink-btn" @click="emit('close')">✕</button>
       </div>
-      <p class="sub">随主线推进，新的山川将逐一开放</p>
+      <p class="sub">山川全图通行，越界凶险自知</p>
       <ul class="list">
         <li v-for="row in rows" :key="row.mapId" :class="row.status">
           <span class="dot" />
           <span class="mname">{{ row.name }}</span>
           <span v-if="row.status === 'here'" class="here">此地</span>
-          <span v-else-if="row.status === 'locked'" class="lock">{{ row.lockHint }}</span>
+          <span v-else-if="row.status === 'atrisk'" class="lock">{{ row.hint }}</span>
           <span v-else class="ok">可前往</span>
         </li>
       </ul>
@@ -122,9 +111,6 @@ const rows = computed<Row[]>(() =>
   font-size: 13px;
   color: #e8dcc0;
 }
-.list li.locked {
-  opacity: 0.55;
-}
 .dot {
   width: 7px;
   height: 7px;
@@ -132,8 +118,11 @@ const rows = computed<Row[]>(() =>
   background: #7ec8a9;
   flex: none;
 }
-.locked .dot {
-  background: #6b5f4a;
+.list li.atrisk {
+  border-color: rgba(160, 60, 45, 0.5);
+}
+.atrisk .dot {
+  background: #c96a4a;
 }
 .mname {
   font-weight: bold;

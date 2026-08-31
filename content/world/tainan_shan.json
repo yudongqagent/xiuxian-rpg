@@ -7,5 +7,9 @@
     "luoyun_fangshi",
     "yuanwu_guo"
   ],
-  "qiDensity": 2.0
+  "qiDensity": 2.0,
+  "danger": {
+    "intel": "古庙檐下讨水的客商压低了声：太南小会鱼龙混杂，夜里有妖兽摸进镇甸叼人——火把要够，修为要够，命才够用。",
+    "levelMin": 12
+  }
 }

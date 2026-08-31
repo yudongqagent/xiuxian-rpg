@@ -6,5 +6,9 @@
   "adjacent": [
     "taiyue_shanmai"
   ],
-  "qiDensity": 2.0
+  "qiDensity": 2.0,
+  "danger": {
+    "intel": "黄枫谷师叔冷冷交代句便拔剑而退：血色塔里没人管你死活——想活着取筑基主药，先把修为提到炼气圆满。",
+    "levelMin": 13
+  }
 }

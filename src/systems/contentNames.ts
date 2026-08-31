@@ -80,13 +80,20 @@ const REGION_MODULES = import.meta.glob('../../content/world/*.json', {
 }) as Record<string, unknown>
 const REGION_NAMES = collectNames(REGION_MODULES, (d) => RegionSchema.parse(d))
 const REGION_QI = new Map<string, number>()
+const REGION_DANGER = new Map<string, { intel: string; levelMin: number }>()
 for (const data of Object.values(REGION_MODULES)) {
   const r = RegionSchema.parse(data)
   REGION_QI.set(r.id, r.qiDensity)
+  if (r.danger) REGION_DANGER.set(r.id, r.danger)
 }
 
 export function regionQiDensity(regionId: string | undefined): number {
   return (regionId && REGION_QI.get(regionId)) || 1
+}
+
+/** V2.3 危险度带：区域软护栏情报（intel 传闻 / 建议境界层数），缺省 = 安全区 */
+export function regionDanger(regionId: string | undefined): { intel: string; levelMin: number } | undefined {
+  return regionId ? REGION_DANGER.get(regionId) : undefined
 }
 
 const ITEM_SOURCES = new Map<string, string[]>()

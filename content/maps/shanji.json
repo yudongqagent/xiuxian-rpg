@@ -66,9 +66,7 @@
         "x": 19,
         "y": 2
       },
-      "label": "东·黄枫谷",
-      "lockQuest": "qm_02_duoshen",
-      "lockHint": "第二章·夺舍之变 完成后方可入谷"
+      "label": "东·黄枫谷"
     },
     {
       "x": 34,
@@ -88,9 +86,7 @@
         "x": 19,
         "y": 2
       },
-      "label": "东·黄枫谷",
-      "lockQuest": "qm_02_duoshen",
-      "lockHint": "第二章·夺舍之变 完成后方可入谷"
+      "label": "东·黄枫谷"
     }
   ],
   "npcPlacements": [

@@ -41,6 +41,22 @@ check('事件', WorldEventSchema, 'events')
 check('任务', QuestSchema, 'quests')
 check('地图', GameMapSchema, 'maps')
 
+// V2.3 章节锁已删：传送点不得再出现 lockQuest/lockHint（改用危险度带软拦）
+{
+  const leaked = new Set<string>()
+  for (const f of readdirSync(join(ROOT, 'maps')).filter((f) => f.endsWith('.json'))) {
+    const raw = readFileSync(join(ROOT, 'maps', f), 'utf-8')
+    for (const key of ['lockQuest', 'lockHint']) {
+      if (raw.includes(`"${key}"`)) leaked.add(`${f}:${key}`)
+    }
+  }
+  for (const msg of leaked) {
+    errors++
+    console.error(`✗ [章节锁残留] ${msg} —— V2.3 全图可达，传送点不得再带锁字段`)
+  }
+  if (leaked.size === 0) console.log('✓ 传送点无章节锁残留')
+}
+
 const regionIds = new Set(readAll('world').map((r) => String(r['id'])))
 const npcIds = new Set(readAll('npcs').map((n) => String(n['id'])))
 const itemIds = new Set(readAll('items').map((i) => String(i['id'])))

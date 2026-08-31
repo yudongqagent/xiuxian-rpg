@@ -322,29 +322,41 @@ try {
     }
   }
 
-  // 8.5 章节锁（世界层）：东·黄枫谷 portal(35,5) 在 qm_02 未完成时踏入被拦下并提示，不传送
+  // 8.5 危险度带（V2.3）：章节锁已删——东·黄枫谷 portal (35,5) 直接踏入即可穿图；
+  //   首次进入危险区（境界不足）展示坊间传闻 toast once，并记录 seenWarnings
   {
     const nav = (x, y) => page.evaluate(([tx, ty]) => window.__xiuxian?.bus.emit('navigate:tile', { x: tx, y: ty }), [x, y])
     const dist = (p) => (p ? Math.abs(p.x - 35) + Math.abs(p.y - 5) : 99)
-    for (let i = 0; i < 20 && dist(await pos()) > 1; i++) {
+    for (let i = 0; i < 30 && dist(await pos()) > 1; i++) {
       await nav(35, 5)
-      await page.waitForTimeout(3500)
+      await page.waitForTimeout(3000)
       await closeBattle()
     }
+    let entered = false
     let toasts = []
-    let p = await pos()
-    await page.waitForTimeout(1800)
-    for (let i = 0; i < 10; i++) {
+    let seen = []
+    for (let i = 0; i < 30 && !entered; i++) {
+      toasts = await page.locator('.toast').allTextContents().catch(() => [])
+      seen = await page.evaluate(() => window.__xiuxian?.scene.world?.().seenWarnings ?? []).catch(() => [])
+      const banner = await page.locator('.area-banner').textContent().catch(() => '')
+      entered = banner.includes('黄枫谷')
+      if (entered) break
+      await page.waitForTimeout(1000)
+      await closeBattle()
       await nav(35, 5)
-      await page.waitForTimeout(500)
-      toasts = await page.locator('.quest-toast, .toast').allTextContents().catch(() => [])
-      p = await pos()
-      if (toasts.some((t) => t.includes('第二章'))) break
-      await page.waitForTimeout(1600)
+    }
+    const warned = toasts.some((t) => t.includes('灰狼')) || toasts.some((t) => t.includes('百药园'))
+    add('门户全开（章节锁已删，直入黄枫谷）', entered, `toasts=${JSON.stringify(toasts.slice(0, 2))}`)
+    add('危险区入场传闻 once', warned && seen.includes('huangfeng_gu'),
+      `toasts=${JSON.stringify(toasts.slice(0, 2))} seenWarnings=${JSON.stringify(seen)}`)
+    // 原路折返山道，保持后续用例仍在 shanji 图执行
+    await closeBattle()
+    for (let i = 0; i < 30 && !(await page.locator('.area-banner').textContent().catch(() => '')).includes('山道'); i++) {
+      await page.evaluate(() => window.__xiuxian?.scene.navDirect(19, 0))
+      await page.waitForTimeout(2200)
       await closeBattle()
     }
-    const blocked = !!p && p.y < 12 && toasts.some((t) => t.includes('第二章'))
-    add('章节锁拦截', blocked, `pos=${p?.x},${p?.y} toasts=${JSON.stringify(toasts)}`)
+    await page.waitForTimeout(800)
   }
 
   // 8.6 自动寻路：点击屏幕下方的可走格，角色应自行走过去（遇怪打断则重点）
@@ -720,6 +732,45 @@ try {
     add('坐化·不可复唤（剧情锚张二无坐化）', (await page.evaluate(() => window.__xiuxian?.scene.world?.()?.npcPassed ?? [])).every((id) => id !== 'zhang_er'), '')
     // 退出大限，回到常态世界日（供 8.94 终结场景独立驱动）
     await page.evaluate(() => window.__xiuxian?.scene.time.set(2801, 0))
+  }
+
+  // 8.99 危险度带（V2.3）：危险区（彩霞山脉·山道）战败 → 气血折半并被抬回安全区七玄门山村
+  {
+    await closeBattle()
+    // 回到七玄门山村：从杂役院 portal(9,19) → qixuanmen(4,14)
+    await page.evaluate(() => window.__xiuxian?.scene.navDirect(9, 19))
+    for (let i = 0; i < 12; i++) {
+      await page.waitForTimeout(2000)
+      await closeBattle()
+      const bt = await page.locator('.area-banner').textContent().catch(() => '')
+      if (bt.includes('七玄门')) break
+    }
+    // 七玄门山村 → 山道（彩霞山脉危险区）：portal(18,27) → shanji(18,2)
+    await page.evaluate(() => window.__xiuxian?.scene.navDirect(18, 27))
+    for (let i = 0; i < 12; i++) {
+      await page.waitForTimeout(2000)
+      await closeBattle()
+      const bt = await page.locator('.area-banner').textContent().catch(() => '')
+      if (bt.includes('山道')) break
+    }
+    await page.waitForTimeout(400)
+    await page.evaluate(() => window.__xiuxian?.scene['battle.lose']?.())
+    let restoredMap = ''
+    let toasts = []
+    for (let i = 0; i < 15 && !restoredMap.includes('七玄门'); i++) {
+      await page.waitForTimeout(1200)
+      const banner = await page.locator('.area-banner').textContent().catch(() => '')
+      restoredMap = banner || ''
+      toasts = await page.locator('.toast').allTextContents().catch(() => [])
+    }
+    const endPos = await pos()
+    const hud = await page.locator('.hud').textContent().catch(() => '')
+    const hp = /血\s*(\d+)\s*\/\s*(\d+)/.exec(hud ?? '')
+    const backHome = !!endPos && Math.abs(endPos.x - 18) <= 2 && Math.abs(endPos.y - 22) <= 2
+    const halved = hp ? +hp[1] === Math.ceil(+hp[2] / 2) : false
+    add('战败抬回安全区（危险区→七玄门山村）', restoredMap.includes('七玄门') && backHome,
+      `banner=${restoredMap.trim().slice(0, 20)} pos=${endPos?.x},${endPos?.y}`)
+    add('战败气血折半（宽惩罚持久）', halved, `血 ${hp?.[1]}/${hp?.[2]}`)
   }
 
   // 8.94 寿元（V1.5）：寿元耗尽即此世终结（结局·寿数尽）——世界时钟冻结，终局可入档

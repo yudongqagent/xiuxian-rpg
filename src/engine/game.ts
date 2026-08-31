@@ -11,7 +11,7 @@ declare global {
         path: () => Array<[number, number]>
         pos: () => [number, number]
         findPath: (tx: number, ty: number) => Array<[number, number]> | null
-        portals: () => Array<{ tile: [number, number]; lockQuest?: string }>
+        portals: () => Array<{ tile: [number, number] }>
         garden: () => unknown
         gather: () => {
           points: Array<{ id: string; x: number; y: number; itemId: string }>
@@ -29,8 +29,10 @@ declare global {
           absentDays: number
           aging: { lockedRealms: string[]; ended: boolean }
           npcPassed: string[]
+          seenWarnings: string[]
           _now: unknown
         }
+        'battle.lose': () => void
         'npc.probe': (npcId: string) => string
         'npc.insight': (npcId: string) =>
           | {

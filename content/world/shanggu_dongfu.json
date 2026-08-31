@@ -6,5 +6,9 @@
   "adjacent": [
     "yuejiang_zhanchang"
   ],
-  "qiDensity": 3.0
+  "qiDensity": 3.0,
+  "danger": {
+    "intel": "抱着断剑退出洞口的散修逢人便劝：好汉三个都折在里头了——筑基后期的灵兽守门，修为不满筑基大圆满，进去就是陪葬。",
+    "levelMin": 18
+  }
 }

@@ -136,6 +136,7 @@ export function bindAudioEvents(): () => void {
     }),
     bus.on('quest:notify', ({ kind }) => {
       if (kind === 'success') SFX.questDone()
+      if (kind === 'danger') SFX.hurt()
     }),
     bus.on('item:acquired', () => SFX.buy()),
   ]
