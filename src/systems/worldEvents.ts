@@ -1,7 +1,8 @@
 /**
- * 事件风暴（V1.4，REDESIGN §6.1 首例「杂役院失窃」）。
+ * 事件风暴（V1.4，REDESIGN §6.1 首例「杂役院失窃」）→ 恩仇风暴（V2.1 报恩/寻仇）。
  * 纯函数：旷工计数 / 条件求值 / 后果结算，供 WorldScene 运行时 + sandbox-sim 回归共用。
  * 正文案/阈值全部来自 content/events/*.json（配置化内容，validate 校验引用）。
+ * V2.1：trigger 三族条件（旷工/记恨/好感）可任意组合叠加，consequences 可算灵石周济与关系清算。
  * 末尾附极小的可订阅风评存储（同 player.ts 做法），供 ShopPanel 展示与价格联动。
  */
 import type { NpcRelationsState } from './relations'
@@ -35,22 +36,45 @@ export interface EventContext {
   relations: NpcRelationsState
 }
 
-/** 事件条件求值：旷工≥threshold 且 grudgeOf 的记恨 > grudgeAt（纯函数） */
+/** 事件条件求值（纯函数）：旷工≥threshold；记恨 > grudgeAt；好感 ≥ affinityAt；族人条件可组合叠加 */
 export function eventTriggered(ev: WorldEvent, ctx: EventContext): boolean {
-  if (absentWorkDays(ctx.lastWorkDay, ctx.day) < ev.trigger.absentDays) return false
-  return relationOf(ctx.relations, ev.trigger.grudgeOf).grudge > ev.trigger.grudgeAt
+  const tr = ev.trigger
+  const conds: boolean[] = []
+  if (tr.absentDays !== undefined) conds.push(absentWorkDays(ctx.lastWorkDay, ctx.day) >= tr.absentDays)
+  if (tr.grudgeOf !== undefined && tr.grudgeAt !== undefined) {
+    conds.push(relationOf(ctx.relations, tr.grudgeOf).grudge > tr.grudgeAt)
+  }
+  if (tr.affinityOf !== undefined && tr.affinityAt !== undefined) {
+    conds.push(relationOf(ctx.relations, tr.affinityOf).affinity >= tr.affinityAt)
+  }
+  if (conds.length === 0) return false
+  return conds.every(Boolean)
 }
 
 export interface EventConsequences {
+  /** 扣灵石（负值，来自 consequences.lingshi） */
   lingshiDelta: number
+  /** 赠灵石（正值，V2.1 报恩来自 consequences.grantLingshi） */
+  grantLingshiDelta: number
+  /** 坊市风评变化 */
   reputationDelta: number
+  /** 关系清算（V2.1）：对某 NPC 扭转好感/记恨（寻仇清记恨、报恩还人情） */
+  relationsDelta?: { npcId: string; affinityDelta?: number; grudgeDelta?: number }
 }
 
-/** 后果结算（纯函数）：返回灵石/风评增量（灵石扣罚为负；风评可为正负） */
+/** 后果结算（纯函数）：返回灵石/风评增量与可选关系清算（灵石扣罚为负；风评可为正负） */
 export function resolveConsequences(ev: WorldEvent): EventConsequences {
   return {
-    lingshiDelta: -ev.consequences.lingshi,
-    reputationDelta: ev.consequences.reputation,
+    lingshiDelta: -(ev.consequences.lingshi ?? 0),
+    grantLingshiDelta: ev.consequences.grantLingshi ?? 0,
+    reputationDelta: ev.consequences.reputation ?? 0,
+    relationsDelta: ev.consequences.relations
+      ? {
+          npcId: ev.consequences.relations.npcId,
+          affinityDelta: ev.consequences.relations.affinityDelta,
+          grudgeDelta: ev.consequences.relations.grudgeDelta,
+        }
+      : undefined,
   }
 }
 

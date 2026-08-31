@@ -1,0 +1,19 @@
+{
+  "id": "en_zhang_er_baoen",
+  "name": "张二报恩",
+  "nominee": "zhang_er",
+  "once": true,
+  "trigger": {
+    "affinityOf": "zhang_er",
+    "affinityAt": 40
+  },
+  "consequences": {
+    "grantLingshi": 12,
+    "relations": {
+      "npcId": "zhang_er",
+      "affinityDelta": -30
+    }
+  },
+  "toast": "天刚擦黑，{npc}在杂役院墙角拉住你，把一包灵石塞进你手心：这些日子多亏你照应园子，连我的喜好都记在心上。这份心意，你收好——灵石十二枚，交个善缘。",
+  "after": "恩已报，情不欠。张二仍把你当半个自家人。"
+}

@@ -114,6 +114,11 @@ function checkRefs() {
       errors++
       console.error(`✗ [引用] NPC ${String(npc['id'])} 的 regionId "${regionId}" 不存在`)
     }
+    // V2.1 收礼清单：likes 里的物品必须存在
+    const likes = Array.isArray(npc['likes']) ? (npc['likes'] as string[]) : []
+    for (const it of likes) {
+      if (!itemIds.has(it)) refErr(`人物 ${String(npc['id'])}`, '收礼物品', it)
+    }
   }
   for (const region of readAll('world')) {
     const adjacent = Array.isArray(region['adjacent']) ? (region['adjacent'] as string[]) : []
@@ -252,8 +257,13 @@ function checkRefs() {
     const eid = String(event['id'])
     const nominee = (event['nominee'] as string) ?? ''
     if (nominee && !npcIds.has(nominee)) refErr(`事件 ${eid}`, '告发者', nominee)
-    const grudgeOf = ((event['trigger'] as { grudgeOf?: string })?.grudgeOf) ?? ''
+    const triggerObj = (event['trigger'] as { grudgeOf?: string; affinityOf?: string }) ?? {}
+    const grudgeOf = triggerObj.grudgeOf ?? ''
     if (grudgeOf && !npcIds.has(grudgeOf)) refErr(`事件 ${eid}`, '记恨来源', grudgeOf)
+    const affinityOf = triggerObj.affinityOf ?? ''
+    if (affinityOf && !npcIds.has(affinityOf)) refErr(`事件 ${eid}`, '好感来源', affinityOf)
+    const relNpc = ((event['consequences'] as { relations?: { npcId?: string } })?.relations)?.npcId
+    if (relNpc && !npcIds.has(relNpc)) refErr(`事件 ${eid}`, '关系清算对象', relNpc)
   }
   console.log('✓ 引用完整性校验通过')
 }

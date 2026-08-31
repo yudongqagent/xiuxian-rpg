@@ -30,14 +30,19 @@ import {
   toPlayerSave,
   updatePlayer,
 } from '../systems/player'
-import { enemiesDropping, npcScheduleFor, npcWatchRadiusFor, regionQiDensity, resolveName } from '../systems/contentNames'
+import { enemiesDropping, npcLikesFor, npcScheduleFor, npcWatchRadiusFor, regionQiDensity, resolveName } from '../systems/contentNames'
 import { ITEMS } from '../systems/itemBook'
-// 2.0 关系图雏形：好感/记恨写回 + 日程查表（V1.3）
+// 2.0 关系图 → 恩仇系统：好感/记恨写回 + 恩仇类型 + 送礼 + 日程查表（V1.3 / V2.1）
 import {
+  AFFINITY_PER_THEFT,
+  GIFT_AFFINITY_FRESH,
+  GIFT_AFFINITY_REPEAT,
   GRUDGE_PER_THEFT,
   bumpRelation,
   createNpcRelationsState,
+  giftAffinityGain,
   npcSpotAt,
+  relationOf,
   type NpcRelationsState,
 } from '../systems/relations'
 // 2.0 事件风暴首例（V1.4）：旷工计数/条件求值/后果结算 + 坊市风评存储
@@ -160,6 +165,8 @@ export class WorldScene extends Phaser.Scene {
   private labor: { lastWorkDay?: number } = {}
   private dialogueOpen = false
   private interactKey!: Phaser.Input.Keyboard.Key
+  /** V2.1 恩仇·送礼：按 G 将背包中该 NPC 收礼清单里的物品赠出（首礼好感+8，七日内重复只+1） */
+  private giftKey!: Phaser.Input.Keyboard.Key
   private prompt!: Phaser.GameObjects.Text
 
   private mapId = DEFAULT_MAP_ID
@@ -407,9 +414,9 @@ export class WorldScene extends Phaser.Scene {
           y: Math.floor(n.sprite.y / TILE),
         })),
       relations: () => ({ ...this.relations, _now: getWorldTime() }),
-      'relations.bump': (npcId: string, delta: { affine?: number; grudge?: number }) => {
+      'relations.bump': (npcId: string, delta: { affinity?: number; affine?: number; grudge?: number }) => {
         this.relations = bumpRelation(this.relations, npcId, {
-          affinity: delta['affine'],
+          affinity: delta['affinity'] ?? delta['affine'],
           grudge: delta['grudge'],
         })
       },
@@ -961,6 +968,7 @@ export class WorldScene extends Phaser.Scene {
       Phaser.Input.Keyboard.Key
     >
     this.interactKey = this.input.keyboard!.addKey('E')
+    this.giftKey = this.input.keyboard!.addKey('G')
     this.keyState = () => ({
       x: (cursors.right.isDown || wasd.D.isDown ? 1 : 0) - (cursors.left.isDown || wasd.A.isDown ? 1 : 0),
       y: (cursors.down.isDown || wasd.S.isDown ? 1 : 0) - (cursors.up.isDown || wasd.W.isDown ? 1 : 0),
@@ -1074,8 +1082,10 @@ export class WorldScene extends Phaser.Scene {
     const near = this.nearestNpc()
     const nearGather = this.nearestGatherPoint()
     if (near && (!nearGather || Phaser.Math.Distance.Between(this.player.x, this.player.y, near.sprite.x, near.sprite.y) <= nearGather.dist)) {
-      this.prompt.setPosition(near.sprite.x, near.sprite.y - TILE).setVisible(true).setText('[E] 交谈')
+      const heldLiked = npcLikesFor(near.id).find((it) => (getPlayer().inventory[it] ?? 0) > 0)
+      this.prompt.setPosition(near.sprite.x, near.sprite.y - TILE).setVisible(true).setText(heldLiked ? '[E] 交谈 · [G] 赠礼' : '[E] 交谈')
       if (Phaser.Input.Keyboard.JustDown(this.interactKey)) this.tryInteract()
+      if (heldLiked && Phaser.Input.Keyboard.JustDown(this.giftKey)) this.tryGift()
     } else if (nearGather && nearGather.available) {
       this.prompt
         .setPosition(nearGather.sprite.x, nearGather.sprite.y - TILE)
@@ -1221,11 +1231,17 @@ export class WorldScene extends Phaser.Scene {
       this.firedEvents.add(ev.id)
       // 结算后果（文本/数值锚全部来自 content/events/*.json）
       const r = resolveConsequences(ev)
-      if (r.lingshiDelta !== 0) {
-        updatePlayer((p) => ({ ...p, lingshi: Math.max(0, p.lingshi + r.lingshiDelta) }))
+      if (r.lingshiDelta !== 0 || r.grantLingshiDelta !== 0) {
+        updatePlayer((p) => ({ ...p, lingshi: Math.max(0, p.lingshi + r.lingshiDelta + r.grantLingshiDelta) }))
         bus.emit('player:stats')
       }
       if (r.reputationDelta !== 0) setReputation(getReputation() + r.reputationDelta)
+      if (r.relationsDelta) {
+        this.relations = bumpRelation(this.relations, r.relationsDelta.npcId, {
+          affinity: r.relationsDelta.affinityDelta,
+          grudge: r.relationsDelta.grudgeDelta,
+        })
+      }
       const who = resolveName('npc', ev.nominee)
       bus.emit('quest:notify', { text: ev.toast.replace('{npc}', who || ev.nominee), kind: 'info' })
       if (ev.after) bus.emit('quest:notify', { text: ev.after, kind: 'info' })
@@ -1273,8 +1289,8 @@ export class WorldScene extends Phaser.Scene {
     if (!near || !near.available) return
     const g = gatherPointById(this.gameMap, near.sprite.data.get('pointId') as string)
     if (!g) return
-    // 2.0 关系图雏形（V1.3）：偷摘当下若有盯梢者目击（watchRadius 内），先记恨+1 再结算时间
-    // （验收：张二在辰时能看到玩家在药园偷摘 → 记恨+1；被逮住那一刻的"在犯案"才计恨）
+    // 2.0 关系图雏形（V1.3）→ 恩仇（V2.1）：偷摘当下若有盯梢者目击（watchRadius 内），记恨+1 好感-2，再结算时间
+    // （验收：张二在辰时能看到玩家在药园偷摘 → 记恨+1、好感-2；被逮住那一刻的"在犯案"才计恨）
     for (const npc of this.npcs) {
       const radius = npcWatchRadiusFor(npc.id)
       if (radius <= 0) continue
@@ -1285,9 +1301,12 @@ export class WorldScene extends Phaser.Scene {
         npc.sprite.y,
       )
       if (d <= radius * TILE + TILE / 2) {
-        this.relations = bumpRelation(this.relations, npc.id, { grudge: GRUDGE_PER_THEFT })
+        this.relations = bumpRelation(this.relations, npc.id, {
+          grudge: GRUDGE_PER_THEFT,
+          affinity: AFFINITY_PER_THEFT,
+        })
         bus.emit('quest:notify', {
-          text: `${resolveName('npc', npc.id)}撞见你偷摘「${g.label}」，记恨 +${GRUDGE_PER_THEFT}`,
+          text: `${resolveName('npc', npc.id)}撞见你偷摘「${g.label}」，记恨 +${GRUDGE_PER_THEFT}、心生芥蒂`,
           kind: 'info',
         })
       }
@@ -1365,5 +1384,26 @@ export class WorldScene extends Phaser.Scene {
     const near = this.nearestNpc()
     if (!near || this.dialogueOpen) return
     bus.emit('dialogue:open', { npcId: near.id })
+  }
+
+  /** V2.1 恩仇·送礼：背包中该 NPC 收礼清单首件可赠物 → 好感写回 + 消耗一件（寄托 G 键，不耗时） */
+  private tryGift(): void {
+    if (this.transitioning || this.battleActive || this.dialogueOpen) return
+    const near = this.nearestNpc()
+    if (!near) return
+    const held = npcLikesFor(near.id).find((it) => (getPlayer().inventory[it] ?? 0) > 0)
+    if (!held) return
+    const today = getWorldTime().day
+    const gain = giftAffinityGain(relationOf(this.relations, near.id), today)
+    this.relations = bumpRelation(this.relations, near.id, { affinity: gain.affinity, lastGiftDay: today })
+    updatePlayer((p) => ({ ...p, inventory: { ...p.inventory, [held]: (p.inventory[held] ?? 0) - 1 } }))
+    bus.emit('player:stats')
+    const name = resolveName('npc', near.id)
+    bus.emit('quest:notify', {
+      text: gain.fresh
+        ? `赠${name}「${resolveName('item', held)}」，${name}感念于心，好感 +${GIFT_AFFINITY_FRESH}`
+        : `再赠${name}「${resolveName('item', held)}」，近日受惠已多，只记薄情 +${GIFT_AFFINITY_REPEAT}`,
+      kind: 'info',
+    })
   }
 }

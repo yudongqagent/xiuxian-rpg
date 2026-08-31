@@ -42,12 +42,19 @@ export interface WorldSnapshot {
   // V2 扩：eventQueue / regionStates / seenHints / fog
 }
 
-/** 单个 NPC 对玩家的关系状态（好感为正、记恨为负；V1.3 窗口见三角形箭头标注） */
+/** 恩仇类型（V2.1，GDD §6 关系 → 恩仇）：由好感/记恨阈值推导，bumpRelation 自动维护 */
+export type RelationType = 'mentor' | 'rival' | 'debt' | 'spouse' | 'enemy'
+
+/** 单个 NPC 对玩家的关系状态（好感为正、记恨为负；V1.3 窗口见三角形箭头标注；V2.1 恩仇类型） */
 export interface NpcRelationState {
   /** 好感 -100..100 */
   affinity: number
   /** 记恨 0..100 */
   grudge: number
+  /** 恩仇类型（V2.1，REDESIGN §6.1）：仇重于恩——记恨够深即盖过旧恩 */
+  type?: RelationType
+  /** 最近一次送礼的世界日（V2.1：同 NPC 七日内重复送礼只记薄情，防刷好感） */
+  lastGiftDay?: number
 }
 
 export function createWorldTime(): WorldTimeData {

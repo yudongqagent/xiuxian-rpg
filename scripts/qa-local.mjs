@@ -605,6 +605,82 @@ try {
       `day ${before?.day}→${after?.day} · 寿余 ${(yrsAfter ?? '').trim()} · toast=${secludeToast}`)
   }
 
+  // 8.96 恩仇（V2.1）：送礼结善缘——G键赠灵草 → 好感+8（7日内重复只+1），攒够40好感触发「张二报恩」
+  {
+    await closeBattle()
+    // 8.91 偷摘留下的灵草仍在背包；当前子时张二在杂役院窝棚 (6,16)，走近按 G 赠出
+    await page.evaluate(() => window.__xiuxian?.scene.navDirect(6, 17))
+    let near = false
+    for (let i = 0; i < 25 && !near; i++) {
+      await page.waitForTimeout(700)
+      const p = await pos()
+      near = !!p && Math.abs(p.x - 6) <= 2 && Math.abs(p.y - 17) <= 2
+    }
+    await page.keyboard.down('g'); await page.waitForTimeout(200); await page.keyboard.up('g')
+    await page.waitForTimeout(600)
+    const relGift = await page.evaluate(() => window.__xiuxian?.scene.relations?.() ?? {})
+    const giftToast = await page.locator('.toast', { hasText: /感念于心/ }).first().isVisible().catch(() => false)
+    add('G键赠灵草 → 好感+8', typeof relGift.zhang_er?.affinity === 'number' && relGift.zhang_er.affinity === 6 && giftToast,
+      `affinity=${relGift.zhang_er?.affinity} grudge=${relGift.zhang_er?.grudge} toast=${giftToast}`)
+    // 连赠两次（同日内重复礼）→ 只+1
+    for (let i = 0; i < 2; i++) {
+      await page.keyboard.down('g'); await page.waitForTimeout(180); await page.keyboard.up('g')
+      await page.waitForTimeout(450)
+    }
+    const relRepeat = await page.evaluate(() => window.__xiuxian?.scene.relations?.() ?? {})
+    const thinToast = await page.locator('.toast', { hasText: /只记薄情/ }).first().isVisible().catch(() => false)
+    add('七日内重复送礼只记薄情 +1', relRepeat.zhang_er?.affinity === 8 && thinToast,
+      `affinity=${relRepeat.zhang_er?.affinity} toast=${thinToast}`)
+    // 好感抬到 40 报恩阈值 → 快进一日 → 「张二报恩」：赠灵石12、还人情-30
+    await page.evaluate(() => window.__xiuxian?.scene['relations.bump']?.('zhang_er', { affinity: 32 }))
+    const ctxBaoPre = await page.evaluate(() => {
+      const w = window.__xiuxian?.scene.world?.()
+      const hud = document.querySelector('.hud')?.textContent ?? ''
+      const m = /灵石\s*(\d+)/.exec(hud)
+      return { day: w?._now?.day, lingshi: m ? +m[1] : -1 }
+    })
+    await page.evaluate((d) => window.__xiuxian?.scene.time.set(d, 0), (ctxBaoPre.day ?? 1) + 1)
+    let baoFired = null
+    for (let i = 0; i < 8 && !baoFired; i++) {
+      await page.waitForTimeout(400)
+      const w = await page.evaluate(() => window.__xiuxian?.scene.world?.())
+      if (w?.events.includes('en_zhang_er_baoen')) baoFired = w
+    }
+    const hudAfter = await page.locator('.hud').textContent().catch(() => '')
+    const lsAfter = /灵石\s*(\d+)/.exec(hudAfter ?? '')
+    const delta = ctxBaoPre.lingshi >= 0 && lsAfter ? +lsAfter[1] - ctxBaoPre.lingshi : NaN
+    const relAfter = await page.evaluate(() => window.__xiuxian?.scene.relations?.() ?? {})
+    const baoToast = await page.locator('.toast', { hasText: /灵石/ }).last().isVisible().catch(() => false)
+    add('「张二报恩」触发：赠灵石12 + 情债还清', !!baoFired && delta === 12 && relAfter.zhang_er?.affinity === 10,
+      `Δ灵石=${delta} affinity=${relAfter.zhang_er?.affinity} type=${relAfter.zhang_er?.type} toast=${baoToast}`)
+  }
+
+  // 8.97 恩仇（V2.1）：结怨成仇 → 「张二寻仇」：扣灵石15、风评-5、记恨清偿大半
+  {
+    await closeBattle()
+    await page.evaluate(() => window.__xiuxian?.scene['relations.bump']?.('zhang_er', { grudge: 6 }))
+    const ctxChouPre = await page.evaluate(() => {
+      const w = window.__xiuxian?.scene.world?.()
+      const hud = document.querySelector('.hud')?.textContent ?? ''
+      const m = /灵石\s*(\d+)/.exec(hud)
+      return { day: w?._now?.day, lingshi: m ? +m[1] : -1, rep: w?.reputation }
+    })
+    await page.evaluate((d) => window.__xiuxian?.scene.time.set(d, 0), (ctxChouPre.day ?? 1) + 1)
+    let chouFired = null
+    for (let i = 0; i < 8 && !chouFired; i++) {
+      await page.waitForTimeout(400)
+      const w = await page.evaluate(() => window.__xiuxian?.scene.world?.())
+      if (w?.events.includes('en_zhang_er_xunchou')) chouFired = w
+    }
+    const hudChou = await page.locator('.hud').textContent().catch(() => '')
+    const lsChou = /灵石\s*(\d+)/.exec(hudChou ?? '')
+    const deltaChou = ctxChouPre.lingshi >= 0 && lsChou ? +lsChou[1] - ctxChouPre.lingshi : NaN
+    const relChou = await page.evaluate(() => window.__xiuxian?.scene.relations?.() ?? {})
+    const repDrop = typeof ctxChouPre.rep === 'number' && typeof chouFired?.reputation === 'number' ? chouFired.reputation - ctxChouPre.rep : -1
+    add('「张二寻仇」触发：扣灵石 + 风评-5 + 记恨清偿', !!chouFired && deltaChou === Math.max(-15, -ctxChouPre.lingshi) && repDrop === -5 && relChou.zhang_er?.grudge === 4,
+      `Δ灵石=${deltaChou} Δ风评=${repDrop} grudge=${relChou.zhang_er?.grudge} type=${relChou.zhang_er?.type}`)
+  }
+
   // 8.94 寿元（V1.5）：寿元耗尽即此世终结（结局·寿数尽）——世界时钟冻结，终局可入档
   {
     await closeBattle()
@@ -662,13 +738,13 @@ try {
   const restoredClock = await clockAfterReload()
   add('时间轴存档保真', restoredClock.day > 1, `重载后 ${restoredClock.label || '（无时钟）'}`)
 
-  // 9.6 事件持久化（V1.4）：重载后风评仍为负、事件已结算标记仍在且不会二次触发
+  // 9.6 事件持久化（V1.4 → V2.1）：重载后风评仍为负、失窃/报恩/寻仇均已入档且不二次触发、记恨清偿至 4
   {
     const w = await page.evaluate(() => window.__xiuxian?.scene.world?.())
     const relLatest = await page.evaluate(() => window.__xiuxian?.scene.relations?.() ?? {})
     const grudge = typeof relLatest.zhang_er?.grudge === 'number' ? relLatest.zhang_er.grudge : -1
     add('事件入档不重触发（重载后）',
-      !!w && w.events.includes('zayiyuan_shiqie') && w.reputation === -20 && grudge >= 3,
+      !!w && w.events.includes('zayiyuan_shiqie') && w.events.includes('en_zhang_er_baoen') && w.events.includes('en_zhang_er_xunchou') && w.reputation === -25 && grudge === 4,
       `events=${JSON.stringify(w?.events)} rep=${w?.reputation} grudge=${grudge}`)
   }
 

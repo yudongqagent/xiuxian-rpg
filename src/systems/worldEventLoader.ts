@@ -18,13 +18,28 @@ export function loadWorldEvents(): void {
       nominee: String(o['nominee'] ?? ''),
       once: o['once'] !== false,
       trigger: {
-        absentDays: Number(trigger?.['absentDays'] ?? 0),
-        grudgeOf: String(trigger?.['grudgeOf'] ?? ''),
-        grudgeAt: Number(trigger?.['grudgeAt'] ?? 0),
+        absentDays: trigger?.['absentDays'] === undefined ? undefined : Number(trigger['absentDays']),
+        grudgeOf: trigger?.['grudgeOf'] === undefined ? undefined : String(trigger['grudgeOf']),
+        grudgeAt: trigger?.['grudgeAt'] === undefined ? undefined : Number(trigger['grudgeAt']),
+        affinityOf: trigger?.['affinityOf'] === undefined ? undefined : String(trigger['affinityOf']),
+        affinityAt: trigger?.['affinityAt'] === undefined ? undefined : Number(trigger['affinityAt']),
       },
       consequences: {
-        lingshi: Number(cons?.['lingshi'] ?? 0),
-        reputation: Number(cons?.['reputation'] ?? 0),
+        lingshi: cons?.['lingshi'] === undefined ? undefined : Number(cons['lingshi']),
+        grantLingshi: cons?.['grantLingshi'] === undefined ? undefined : Number(cons['grantLingshi']),
+        reputation: cons?.['reputation'] === undefined ? undefined : Number(cons['reputation']),
+        relations:
+          cons?.['relations'] === undefined
+            ? undefined
+            : {
+                npcId: String((cons['relations'] as Record<string, unknown>)['npcId'] ?? ''),
+                affinityDelta: (cons['relations'] as Record<string, unknown>)['affinityDelta'] === undefined
+                  ? undefined
+                  : Number((cons['relations'] as Record<string, unknown>)['affinityDelta']),
+                grudgeDelta: (cons['relations'] as Record<string, unknown>)['grudgeDelta'] === undefined
+                  ? undefined
+                  : Number((cons['relations'] as Record<string, unknown>)['grudgeDelta']),
+              },
       },
       toast: String(o['toast'] ?? ''),
       after: o['after'] === undefined ? undefined : String(o['after']),

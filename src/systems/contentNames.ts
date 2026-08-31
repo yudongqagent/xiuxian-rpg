@@ -22,10 +22,13 @@ const NPC_NAMES = collectNames(NPC_MODULES, (d) => NpcSchema.parse(d))
 const NPC_SCHEDULES = new Map<string, NpcSchedule>()
 /** V1.3 目击半径（格）：偷摘药园时此 NPC 在场即记恨＋1 */
 const NPC_WATCH_RADIUS = new Map<string, number>()
+/** V2.1 收礼清单：npcId → itemId[]（玩家持有其一可近身赠出） */
+const NPC_LIKES = new Map<string, string[]>()
 for (const data of Object.values(NPC_MODULES)) {
   const npc = NpcSchema.parse(data)
   if (npc.schedule) NPC_SCHEDULES.set(npc.id, npc.schedule)
   if (npc.watchRadius !== undefined) NPC_WATCH_RADIUS.set(npc.id, npc.watchRadius)
+  if (npc.likes) NPC_LIKES.set(npc.id, npc.likes)
 }
 
 /** NPC 日程表（缺省 undefined → 静态站位） */
@@ -36,6 +39,11 @@ export function npcScheduleFor(npcId: string): NpcSchedule | undefined {
 /** NPC 目击半径（格），缺省 0 = 不盯梢 */
 export function npcWatchRadiusFor(npcId: string): number {
   return NPC_WATCH_RADIUS.get(npcId) ?? 0
+}
+
+/** NPC 收礼清单（V2.1），缺省空数组 = 不收礼 */
+export function npcLikesFor(npcId: string): string[] {
+  return NPC_LIKES.get(npcId) ?? []
 }
 const ENEMY_NAMES = collectNames(
   import.meta.glob('../../content/enemies/*.json', { eager: true }) as Record<string, unknown>,

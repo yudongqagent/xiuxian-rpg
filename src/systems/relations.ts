@@ -1,12 +1,13 @@
 /**
- * 关系图雏形（V1.3，REDESIGN §6.2）。
- * 纯函数：好感/记恨的写回与读取，供 WorldScene 运行时 + sandbox-sim 回归共用。
- * 写回规则：玩家在 NPC 目击半径内偷摘（采集）→ 记恨 +1（张二盯梢药园）。
- * 口味锚：记恨 1-2 口头不满，3+ 告发（V1.4 事件「杂役院失窃」入口），5+ 结仇。
+ * 关系图雏形（V1.3，REDESIGN §6.2）→ 恩仇系统（V2.1，REDESIGN §6.1）。
+ * 纯函数：好感/记恨的写回与读取 + 恩仇类型推导，供 WorldScene 运行时 + sandbox-sim 回归共用。
+ * 写回规则：玩家偷摘被目击 → 记恨+1 好感-2；送礼 → 好感+8（七日内重复送只+1，防刷）。
+ * 恩仇类型：记恨 ≥4 结怨(rival)、≥8 成仇(enemy)；好感 ≥30 欠情(debt)、≥60 为师(mentor)。
+ * 口味锚：记恨 1-2 口头不满，3+ 告发（V1.4 事件「杂役院失窃」入口），阈值成就 → 事件风暴（报恩/寻仇）。
  */
 import type { WorldTimeData } from './time'
 import { SHICHEN_NAMES } from './time'
-import type { NpcRelationState } from './time'
+import type { NpcRelationState, RelationType } from './time'
 
 export type NpcRelationsState = Record<string, NpcRelationState>
 
@@ -16,22 +17,51 @@ export function createNpcRelationsState(): NpcRelationsState {
 
 /** 单次偷摘导致的记恨增量（V1.3 验收：张二在辰时看到偷摘 → 记恨+1） */
 export const GRUDGE_PER_THEFT = 1
+/** 单次偷摘连带的好感折损（V2.1：偷摘伤感情） */
+export const AFFINITY_PER_THEFT = -2
+/** 首礼/间隔七日后全量好感（V2.1 送礼写回） */
+export const GIFT_AFFINITY_FRESH = 8
+/** 七日内重复送礼只记薄情 */
+export const GIFT_AFFINITY_REPEAT = 1
+/** 送礼好感衰减窗口（世界日） */
+export const GIFT_GRACE_DAYS = 7
+/** 结仇阈值：记恨 ≥ 此值 → enemy */
+export const ENMITY_GRUDGE = 8
+/** 结怨阈值：记恨 ≥ 此值 → rival */
+export const RIVAL_GRUDGE = 4
+/** 师恩阈值：好感 ≥ 此值 → mentor */
+export const MENTOR_AFFINITY = 60
+/** 情债阈值：好感 ≥ 此值 → debt */
+export const DEBT_AFFINITY = 30
 
 const clampAffinity = (v: number): number => Math.max(-100, Math.min(100, Math.round(v)))
 const clampGrudge = (v: number): number => Math.max(0, Math.min(100, Math.round(v)))
 
-/** 对某 NPC 写回一次关系变化：好感/记恨均按增量叠加并钳制 */
+/** 恩仇类型推导（V2.1）：仇重于恩，记恨优先判定；无达标面回退 undefined */
+export function relationTypeFor(rel: { affinity: number; grudge: number }): RelationType | undefined {
+  if (rel.grudge >= ENMITY_GRUDGE) return 'enemy'
+  if (rel.grudge >= RIVAL_GRUDGE) return 'rival'
+  if (rel.affinity >= MENTOR_AFFINITY) return 'mentor'
+  if (rel.affinity >= DEBT_AFFINITY) return 'debt'
+  return undefined
+}
+
+/** 对某 NPC 写回一次关系变化：好感/记恨按增量叠加并钳制，恩仇类型随阈值自动推导 */
 export function bumpRelation(
   state: NpcRelationsState,
   npcId: string,
   delta: Partial<NpcRelationState>,
 ): NpcRelationsState {
   const cur = state[npcId] ?? { affinity: 0, grudge: 0 }
+  const affinity = clampAffinity(cur.affinity + (delta.affinity ?? 0))
+  const grudge = clampGrudge(cur.grudge + (delta.grudge ?? 0))
   return {
     ...state,
     [npcId]: {
-      affinity: clampAffinity(cur.affinity + (delta.affinity ?? 0)),
-      grudge: clampGrudge(cur.grudge + (delta.grudge ?? 0)),
+      affinity,
+      grudge,
+      type: delta.type ?? relationTypeFor({ affinity, grudge }),
+      lastGiftDay: delta.lastGiftDay ?? cur.lastGiftDay,
     },
   }
 }
@@ -39,6 +69,18 @@ export function bumpRelation(
 /** 读取某 NPC 对玩家的关系（缺省中性） */
 export function relationOf(state: NpcRelationsState, npcId: string): NpcRelationState {
   return state[npcId] ?? { affinity: 0, grudge: 0 }
+}
+
+/** V2.1 送礼好感结算：同 NPC 七日内再送只记薄礼（+1），首礼/间隔满七日全量（+8） */
+export function giftAffinityGain(
+  rel: NpcRelationState | undefined,
+  today: number,
+): { affinity: number; fresh: boolean } {
+  const last = rel?.lastGiftDay
+  const fresh = last === undefined || today - last >= GIFT_GRACE_DAYS
+  return fresh
+    ? { affinity: GIFT_AFFINITY_FRESH, fresh: true }
+    : { affinity: GIFT_AFFINITY_REPEAT, fresh: false }
 }
 
 /**

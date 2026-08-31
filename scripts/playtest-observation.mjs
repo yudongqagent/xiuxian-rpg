@@ -107,6 +107,44 @@ await page.waitForTimeout(600)
 const g2 = await grudge()
 note(`午时采 (22,6)：记恨 ${g1} → ${g2}（张二午已在 (6,16)，不在盯梢位） · 时钟=${await clock()}`)
 
+// —— 观察主线：道贺「善缘 vs 药园经济」两条互相排挤的路（V2.1 恩仇·送礼） ——
+// 两株灵草在手（两次偷摘所得）：先送一株结善缘（首礼好感+8），当天再送则旬内只记薄情+1
+const a0 = (await page.evaluate(() => window.__xiuxian?.scene.relations?.() ?? {}))?.zhang_er?.affinity ?? -9
+await page.evaluate(() => window.__xiuxian?.scene.navDirect(6, 17)).catch(() => {})
+let znear = false
+for (let i = 0; i < 20 && !znear; i++) {
+  await page.waitForTimeout(700)
+  const p = await pos()
+  znear = !!p && Math.abs(p.x - 6) <= 2 && Math.abs(p.y - 17) <= 2
+}
+await page.keyboard.down('g')
+await page.waitForTimeout(200)
+await page.keyboard.up('g')
+await page.waitForTimeout(500)
+const a1 = (await page.evaluate(() => window.__xiuxian?.scene.relations?.() ?? {}))?.zhang_er?.affinity ?? -9
+const toastFresh = await page.locator('.toast', { hasText: /感念于心/ }).last().textContent().catch(() => '')
+await page.keyboard.down('g')
+await page.waitForTimeout(200)
+await page.keyboard.up('g')
+await page.waitForTimeout(500)
+const a2 = (await page.evaluate(() => window.__xiuxian?.scene.relations?.() ?? {}))?.zhang_er?.affinity ?? -9
+note(`送灵草两株（张二喜收）：首礼好感 ${a0}→${a1}（${(toastFresh ?? '').trim().slice(0, 22)}...），当天再送只 +${a2 - a1} 记薄情 · 机会成本：灵草市价 3灵石×2=6灵石`)
+// 攒满 40 好感（差额补齐后仍是"过了整个旬日的亲善积累"），快进到旬末 —— 「张二报恩」现场
+await page.evaluate((gap) => window.__xiuxian?.scene['relations.bump']?.('zhang_er', { affinity: gap }), 40 - a2)
+const lsBao0 = await page.evaluate(() => {
+  const m = /灵石\s*(\d+)/.exec(document.querySelector('.hud')?.textContent ?? '')
+  return m ? +m[1] : -1
+})
+await page.evaluate(() => window.__xiuxian?.scene.time.set(40, 1))
+await page.waitForTimeout(800)
+const baoToast = await page.locator('.toast', { hasText: /灵石十二枚/ }).last().textContent().catch(() => '')
+const relBao = await page.evaluate(() => window.__xiuxian?.scene.relations?.() ?? {})
+const lsBao1 = await page.evaluate(() => {
+  const m = /灵石\s*(\d+)/.exec(document.querySelector('.hud')?.textContent ?? '')
+  return m ? +m[1] : -1
+})
+note(`「张二报恩」应验：${(baoToast ?? '').trim().slice(0, 34)} · 好感 ${a2}=>${relBao?.zhang_er?.affinity ?? '-'} · 灵石 ${lsBao0}→${lsBao1}`)
+
 // —— 收尾：突破失败 → 寿元不足半寿 → 大境界硬锁（承接 V1.5） ——
 await page.evaluate(() => window.__xiuxian?.scene['realm.set']?.(13))
 await page.evaluate(() => window.__xiuxian?.scene.time.set(3661, 0))
@@ -121,11 +159,14 @@ await page.waitForTimeout(500)
 const dreadful = (await page.locator('.dreadful').textContent().catch(() => '')).trim()
 note(`突破失败收尾：${dreadful.slice(0, 46)}`)
 
-const ok = g1 > g0 && g1 >= 1 && g2 === g1 && /寿元剩余 37 年无望筑基/.test(dreadful)
-console.log(`\n【试玩具体观察】张二的盯梢因果随时辰表切换：${ok ? '成立' : '未断言成功'}`)
+const ok = g1 > g0 && g1 >= 1 && g2 === g1 && (a1 === a0 + 8 && a2 === a1 + 1) && /灵石十二枚/.test(baoToast ?? '') && relBao?.zhang_er?.affinity === 10 && /寿元剩余 37 年无望筑基/.test(dreadful)
+console.log(`\n【试玩具体观察一】张二的盯梢因果随时辰表切换：${g1 > g0 && g2 === g1 ? '成立' : '未断言成功'}`)
 console.log(`  ① 辰时偷摘被目击：记恨 ${g0}→${g1}`)
 console.log(`  ② 午时偷摘无人知：记恨 ${g1}→${g2}`)
-console.log(`  ③ 突破失败收尾：${dreadful.slice(0, 46)}`)
+console.log(`【试玩具体观察二】善缘与药园经济互相排挤（V2.1）：${a1 === a0 + 8 && a2 === a1 + 1 && /灵石十二枚/.test(baoToast ?? '') ? '成立' : '未断言成功'}`)
+console.log(`  ③ 首礼好感 +8（${a0}→${a1}），旬内再送只 +${a2 - a1}——送礼花灵草、卖草换灵石，两条路二选一`)
+console.log(`  ④ 好感攒满 40 → 「张二报恩」赠灵石 12，情债了结（灵石 ${lsBao0}→${lsBao1}，好感 ${a2}→${relBao?.zhang_er?.affinity ?? '-'}）`)
+console.log(`  ⑤ 突破失败收尾：${dreadful.slice(0, 46)}`)
 console.log(`总览（真实游玩体验采集于 preview）：
 ${LOG.map((l) => '  ' + l).join('\n')}`)
 

@@ -23,11 +23,18 @@ import {
   type GatherWorldState,
 } from '../src/systems/gather'
 import {
+  AFFINITY_PER_THEFT,
+  DEBT_AFFINITY,
+  ENMITY_GRUDGE,
+  GRUDGE_PER_THEFT,
+  MENTOR_AFFINITY,
+  RIVAL_GRUDGE,
   bumpRelation,
   createNpcRelationsState,
+  giftAffinityGain,
   npcSpotAt,
   relationOf,
-  GRUDGE_PER_THEFT,
+  relationTypeFor,
   type NpcRelationsState,
 } from '../src/systems/relations'
 import type { WorldEvent } from '../src/systems/schemas'
@@ -564,6 +571,61 @@ setReputation(0)
   check('·V1.6 炼丹 < 卖原料：药农灵石占优', alch.p.lingshi < nong.p.lingshi && alch.p.inventory.huichun_san === undefined, `炼丹 ${alch.p.lingshi} < 挖药 ${nong.p.lingshi}`)
   check('·V1.6 内卷被告发：唯一触发失窃', juan.events.length === 1 && juan.events[0] === 'zayiyuan_shiqie' && juan.rep === -20 && juan.grudge >= 3, `事件=${juan.events.join(',')} 风评=${juan.rep} 记恨=${juan.grudge}`)
   setReputation(0)
+}
+
+// V2.1 恩仇系统（REDESIGN §6.1）：类型推导优先级 / 送礼衰减 / 事件三族条件 / 后果清算
+{
+  const none = relationTypeFor({ affinity: 0, grudge: 0 })
+  check('·V2.1 恩仇类型推导：中性', none === undefined, `type=${none}`)
+  check('·V2.1 恩仇类型推导：情债(debt)≥30好感', relationTypeFor({ affinity: DEBT_AFFINITY, grudge: 0 }) === 'debt', '')
+  check('·V2.1 恩仇类型推导：师恩(mentor)≥60好感', relationTypeFor({ affinity: 88, grudge: 3 }) === 'mentor', '')
+  check('·V2.1 恩仇类型推导：结怨(rival)盖过师恩', relationTypeFor({ affinity: 88, grudge: RIVAL_GRUDGE }) === 'rival', '')
+  check('·V2.1 恩仇类型推导：成仇(enemy)盖过一切', relationTypeFor({ affinity: 88, grudge: ENMITY_GRUDGE }) === 'enemy', '')
+
+  let rels = createNpcRelationsState()
+  rels = bumpRelation(rels, 'zhang_er', { affinity: DEBT_AFFINITY })
+  check('·V2.1 bumpRelation 越阈自动结情债', relationOf(rels, 'zhang_er').type === 'debt', `type=${relationOf(rels, 'zhang_er').type}`)
+  rels = bumpRelation(rels, 'zhang_er', { affinity: DEBT_AFFINITY })
+  check('·V2.1 bumpRelation 双送成师恩', relationOf(rels, 'zhang_er').affinity === MENTOR_AFFINITY && relationOf(rels, 'zhang_er').type === 'mentor', `affinity=${relationOf(rels, 'zhang_er').affinity}`)
+
+  const first = giftAffinityGain(undefined, 3)
+  const repeat = giftAffinityGain({ affinity: 8, grudge: 0, lastGiftDay: 3 }, 3)
+  const spaced = giftAffinityGain({ affinity: 9, grudge: 0, lastGiftDay: 10 }, 17)
+  check('·V2.1 送礼首礼全量+8', first.affinity === 8 && first.fresh, `affinity=${first.affinity}`)
+  check('·V2.1 送礼七日内重复只+1', repeat.affinity === 1 && !repeat.fresh, `affinity=${repeat.affinity}`)
+  check('·V2.1 送礼间隔满七日恢复+8', spaced.affinity === 8 && spaced.fresh, `affinity=${spaced.affinity}`)
+
+  let theft = createNpcRelationsState()
+  theft = bumpRelation(theft, 'zhang_er', { grudge: GRUDGE_PER_THEFT, affinity: AFFINITY_PER_THEFT })
+  check('·V2.1 偷摘目击写回：记恨+1 好感-2', theft.zhang_er.grudge === 1 && theft.zhang_er.affinity === -2, `grudge=${theft.zhang_er.grudge} affinity=${theft.zhang_er.affinity}`)
+
+  const baoen: WorldEvent = {
+    id: 'en_zhang_er_baoen', name: '报恩', nominee: 'zhang_er', once: true,
+    trigger: { affinityOf: 'zhang_er', affinityAt: 40 },
+    consequences: { grantLingshi: 12, relations: { npcId: 'zhang_er', affinityDelta: -30 } },
+    toast: '',
+  }
+  const baoenStrict = { ...baoen, trigger: { affinityOf: 'zhang_er', affinityAt: 45 } }
+  const ctxBao = { day: 30, lastWorkDay: 29, relations: bumpRelation(createNpcRelationsState(), 'zhang_er', { affinity: 42 }) }
+  const ctxBaoLow = { ...ctxBao, relations: bumpRelation(createNpcRelationsState(), 'zhang_er', { affinity: 39 }) }
+  check('·V2.1 报恩按好感触发（手提≥阈）', eventTriggered(baoen, ctxBao) && !eventTriggered(baoenStrict, ctxBao) && !eventTriggered(baoen, ctxBaoLow), '')
+
+  const xunchou: WorldEvent = {
+    id: 'en_zhang_er_xunchou', name: '寻仇', nominee: 'zhang_er', once: true,
+    trigger: { grudgeOf: 'zhang_er', grudgeAt: 6 },
+    consequences: { lingshi: 15, reputation: -5, relations: { npcId: 'zhang_er', grudgeDelta: -6 } },
+    toast: '',
+  }
+  const ctxChou = { day: 30, lastWorkDay: 29, relations: bumpRelation(createNpcRelationsState(), 'zhang_er', { grudge: 7 }) }
+  check('·V2.1 寻仇按记恨触发（>阈）', eventTriggered(xunchou, ctxChou), '')
+
+  const baoRes = resolveConsequences(baoen)
+  check('·V2.1 报恩后果：赠灵石12 还人情-30', baoRes.grantLingshiDelta === 12 && baoRes.relationsDelta?.affinityDelta === -30 && baoRes.lingshiDelta === 0, `grant=${baoRes.grantLingshiDelta}`)
+  const chouRes = resolveConsequences(xunchou)
+  check('·V2.1 寻仇后果：扣15 风评-5 清记恨6', chouRes.lingshiDelta === -15 && chouRes.reputationDelta === -5 && chouRes.relationsDelta?.grudgeDelta === -6, `Δ灵石=${chouRes.lingshiDelta} Δ风评=${chouRes.reputationDelta}`)
+
+  const ctxShiqie = { day: 30, lastWorkDay: 22, relations: bumpRelation(createNpcRelationsState(), 'zhang_er', { grudge: 3 }) }
+  check('·V2.1 失窃族兼容（旷工8+记恨3）', eventTriggered(zayiyuanShiqieJson as unknown as WorldEvent, ctxShiqie), '')
 }
 
 console.log(`\nSANDBOX-SIM: ${passed} 项通过, ${failed} 项失败`)

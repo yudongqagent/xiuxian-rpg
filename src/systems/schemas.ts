@@ -90,6 +90,8 @@ export const NpcSchema = z.object({
   schedule: NpcScheduleSchema.optional(),
   /** 目击半径（格）：柳锁行为，如张二在药园盯梢（V1.3 记恨池） */
   watchRadius: z.number().int().min(1).max(12).optional(),
+  /** 收礼清单（V2.1 恩仇·送礼）：itemId 列表；玩家持有其一并走进 NPC 即可按 G 赠出（validate 校验存在性） */
+  likes: z.array(z.string().regex(/^[a-z0-9_]+$/)).min(1).optional(),
 })
 
 export const RegionSchema = z.object({
@@ -185,20 +187,59 @@ export const WorldEventSchema = z.object({
   nominee: z.string().regex(/^[a-z0-9_]+$/),
   /** 只触发一次（防刷屏；重复游玩需新档） */
   once: z.boolean().default(true),
-  trigger: z.object({
-    /** 连续旷工日数阈值：lastWorkDay 距今日 ≥ 此值 */
-    absentDays: z.number().int().min(1).max(999),
-    /** 记恨来源 NPC id（validate 校验存在性） */
-    grudgeOf: z.string().regex(/^[a-z0-9_]+$/),
-    /** 记恨须严格大于此值（如 grudgeAt=2 表示记恨>2） */
-    grudgeAt: z.number().int().min(0).max(100),
-  }),
-  consequences: z.object({
-    /** 扣灵石（正数=扣；clamp≥0） */
-    lingshi: z.number().int().min(1).max(99999),
-    /** 坊市风评变化（负=下降；clamp -100..100） */
-    reputation: z.number().int().min(-100).max(100),
-  }),
+  trigger: z
+    .object({
+      /** 连续旷工日数阈值：lastWorkDay 距今日 ≥ 此值 */
+      absentDays: z.number().int().min(1).max(999).optional(),
+      /** 记恨来源 NPC id（validate 校验存在性）；与 grudgeAt 成对 */
+      grudgeOf: z.string().regex(/^[a-z0-9_]+$/).optional(),
+      /** 记恨须严格大于此值（如 grudgeAt=2 表示记恨>2） */
+      grudgeAt: z.number().int().min(0).max(100).optional(),
+      /** 好感来源 NPC id（V2.1 报恩）；与 affinityAt 成对 */
+      affinityOf: z.string().regex(/^[a-z0-9_]+$/).optional(),
+      /** 好感须不小于此值（V2.1 报恩阈值，如 affinityAt=40） */
+      affinityAt: z.number().int().min(0).max(100).optional(),
+    })
+    .superRefine((t, ctx) => {
+      const conds = [t.absentDays !== undefined, t.grudgeOf !== undefined, t.affinityOf !== undefined]
+      if (!conds.some(Boolean)) {
+        ctx.addIssue({ code: 'custom', message: 'trigger 至少需要旷工/记恨/好感三者之一作为触发条件' })
+      }
+      if ((t.grudgeOf !== undefined) !== (t.grudgeAt !== undefined)) {
+        ctx.addIssue({ code: 'custom', message: 'grudgeOf 与 grudgeAt 必须成对出现' })
+      }
+      if ((t.affinityOf !== undefined) !== (t.affinityAt !== undefined)) {
+        ctx.addIssue({ code: 'custom', message: 'affinityOf 与 affinityAt 必须成对出现' })
+      }
+    }),
+  consequences: z
+    .object({
+      /** 扣灵石（正数=扣；clamp≥0） */
+      lingshi: z.number().int().min(1).max(99999).optional(),
+      /** 赠灵石（V2.1 报恩；正数=赠） */
+      grantLingshi: z.number().int().min(1).max(99999).optional(),
+      /** 坊市风评变化（负=下降；clamp -100..100） */
+      reputation: z.number().int().min(-100).max(100).optional(),
+      /** 关系清算（V2.1）：对某 NPC 扭转好感/记恨（寻仇清记恨、报恩还人情） */
+      relations: z
+        .object({
+          npcId: z.string().regex(/^[a-z0-9_]+$/),
+          affinityDelta: z.number().int().min(-100).max(100).optional(),
+          grudgeDelta: z.number().int().min(-100).max(100).optional(),
+        })
+        .optional(),
+    })
+    .superRefine((c, ctx) => {
+      const effects = [
+        c.lingshi !== undefined,
+        c.grantLingshi !== undefined,
+        c.reputation !== undefined,
+        c.relations !== undefined,
+      ]
+      if (!effects.some(Boolean)) {
+        ctx.addIssue({ code: 'custom', message: 'consequences 至少需要一项效果' })
+      }
+    }),
   /** 触发文案（≤200 字，古典白话；{npc} 会被替换为告发者名） */
   toast: z.string().min(1).max(200),
   /** 触发后追加的系统提示 */

@@ -1,0 +1,20 @@
+{
+  "id": "en_zhang_er_xunchou",
+  "name": "张二寻仇",
+  "nominee": "zhang_er",
+  "once": true,
+  "trigger": {
+    "grudgeOf": "zhang_er",
+    "grudgeAt": 6
+  },
+  "consequences": {
+    "lingshi": 15,
+    "reputation": -5,
+    "relations": {
+      "npcId": "zhang_er",
+      "grudgeDelta": -6
+    }
+  },
+  "toast": "{npc}领着一帮杂役堵住你：祸害我园子一回回，真当我看不见？你赔十五灵石，这一桩我便咽下。坊市里也已传开你的名号。",
+  "after": "张二记恨大半消退，仇怨暂且揭过——可药园的门，从此对你紧了些。"
+}

@@ -19,5 +19,6 @@
     "午": [6, 16],
     "未": [6, 16]
   },
-  "watchRadius": 5
+  "watchRadius": 5,
+  "likes": ["qi_xie_ling_cao"]
 }
