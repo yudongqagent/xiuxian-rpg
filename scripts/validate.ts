@@ -265,6 +265,21 @@ function checkRefs() {
     const relNpc = ((event['consequences'] as { relations?: { npcId?: string } })?.relations)?.npcId
     if (relNpc && !npcIds.has(relNpc)) refErr(`事件 ${eid}`, '关系清算对象', relNpc)
   }
+  // V2.2 生命周期校验：cultivate 上限 ≥ 开局层数；剧情锚 NPC（张二/李三/墨大夫）免疫死亡（§6.1 不可配 cultivate）
+  const anchorImmune = new Set(['zhang_er', 'li_san', 'mo_dafu'])
+  for (const npc of readAll('npcs')) {
+    const id = String(npc['id'])
+    const cult = (npc['cultivate'] as { level?: number; cap?: number; growthYears?: number; lifespanYears?: number } | undefined)
+    if (!cult) continue
+    if (anchorImmune.has(id)) {
+      errors++
+      console.error(`✗ [生命周期] 剧情锚 NPC ${id} 不应配置 cultivate（§6.1 免疫死亡）`)
+    }
+    if (typeof cult.level === 'number' && typeof cult.cap === 'number' && cult.cap < cult.level) {
+      errors++
+      console.error(`✗ [生命周期] NPC ${id} 修炼上限 cap(${cult.cap}) < 开局层数 level(${cult.level})`)
+    }
+  }
   console.log('✓ 引用完整性校验通过')
 }
 if (errors === 0) checkRefs()

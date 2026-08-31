@@ -30,7 +30,7 @@ import {
   toPlayerSave,
   updatePlayer,
 } from '../systems/player'
-import { enemiesDropping, npcLikesFor, npcScheduleFor, npcWatchRadiusFor, regionQiDensity, resolveName } from '../systems/contentNames'
+import { enemiesDropping, npcCultivateFor, npcCultivateIds, npcLikesFor, npcProbeFor, npcScheduleFor, npcWatchRadiusFor, regionQiDensity, resolveName } from '../systems/contentNames'
 import { ITEMS } from '../systems/itemBook'
 // 2.0 关系图 → 恩仇系统：好感/记恨写回 + 恩仇类型 + 送礼 + 日程查表（V1.3 / V2.1）
 import {
@@ -45,6 +45,8 @@ import {
   relationOf,
   type NpcRelationsState,
 } from '../systems/relations'
+// 2.0 NPC 生命周期（V2.2）：修炼演进 + 寿元大限 + 日程打探兜底文案
+import { cultivateLevelOnDay, lifespanYearOf, passedAwayOnDay, scheduleSummary } from '../systems/npclife'
 // 2.0 事件风暴首例（V1.4）：旷工计数/条件求值/后果结算 + 坊市风评存储
 import {
   WORLD_EVENTS,
@@ -167,6 +169,12 @@ export class WorldScene extends Phaser.Scene {
   private interactKey!: Phaser.Input.Keyboard.Key
   /** V2.1 恩仇·送礼：按 G 将背包中该 NPC 收礼清单里的物品赠出（首礼好感+8，七日内重复只+1） */
   private giftKey!: Phaser.Input.Keyboard.Key
+  /** V2.2 打探键 H：向 NPC 询问情报（日程 / 修为 / 寿元） */
+  private probeKey!: Phaser.Input.Keyboard.Key
+  /** V2.2 NPC 生命周期：npcId → 出生日/当前修炼层数（世界历演进，已坐化不推进） */
+  private npcLife: Record<string, { bornDay: number; level: number }> = {}
+  /** V2.2 NPC 坐化登记（once 防重复，入档随世界快照） */
+  private npcPassed: string[] = []
   private prompt!: Phaser.GameObjects.Text
 
   private mapId = DEFAULT_MAP_ID
@@ -344,6 +352,9 @@ export class WorldScene extends Phaser.Scene {
     this.firedEvents = new Set(save?.world?.events ?? [])
     this.labor = { lastWorkDay: save?.world?.labor?.lastWorkDay }
     setReputation(save?.world?.reputation ?? 0)
+    // 2.0 NPC 生命周期（V2.2）：恢复 NPC 修炼进度/坐化登记（旧档缺省空）
+    this.npcLife = save?.world?.npcs ? { ...save.world.npcs } : {}
+    this.npcPassed = [...(save?.world?.npcPassed ?? [])]
     // 2.0 寿元（V1.5）：恢复大境界硬锁/此世终结（寿元推进由世界历驱动，存日即可推算年龄）
     setAging({
       lockedRealms: save?.world?.aging?.lockedRealms ?? [],
@@ -426,8 +437,12 @@ export class WorldScene extends Phaser.Scene {
           reputation: getReputation(),
           absentDays: absentWorkDays(this.labor.lastWorkDay, getWorldTime().day),
           aging: getAging(),
+          npcPassed: [...this.npcPassed],
           _now: getWorldTime(),
         }),
+      // 2.0 NPC 生命周期（V2.2）：打探文本 / 洞察（修炼层数+坐化大限年）＝ qa-local 确定性回归钩子
+      'npc.probe': (npcId: string) => this.probeTextFor(npcId),
+      'npc.insight': (npcId: string) => this.insightFor(npcId),
       // 2.0 寿元（V1.5）：qa-local 确定性回归 —— 强制突破随机结果 / 快进到指定境界门
       'rng.force': (v: number | null) => setRngOverride(v === null ? null : () => v),
       'realm.set': (level: number) => {
@@ -969,6 +984,7 @@ export class WorldScene extends Phaser.Scene {
     >
     this.interactKey = this.input.keyboard!.addKey('E')
     this.giftKey = this.input.keyboard!.addKey('G')
+    this.probeKey = this.input.keyboard!.addKey('H')
     this.keyState = () => ({
       x: (cursors.right.isDown || wasd.D.isDown ? 1 : 0) - (cursors.left.isDown || wasd.A.isDown ? 1 : 0),
       y: (cursors.down.isDown || wasd.S.isDown ? 1 : 0) - (cursors.up.isDown || wasd.W.isDown ? 1 : 0),
@@ -1002,6 +1018,8 @@ export class WorldScene extends Phaser.Scene {
         this.runEventTicks()
         // 2.0 寿元（V1.5）：世界时刻推进即检查寿元耗尽之终局
         this.checkLifespan()
+        // 2.0 NPC 生命周期（V2.2）：世界时刻推进即推进 NPC 修炼与坐化判定
+        this.runNpcLifeTicks()
       }),
       // 2.0 寿元（V1.5）：打坐参悟需漫长岁月，闭关一键跳过等待（快进岁月 = 消耗寿元）
       bus.on('meditate:seclude', () => this.secludeOneYear()),
@@ -1083,8 +1101,13 @@ export class WorldScene extends Phaser.Scene {
     const nearGather = this.nearestGatherPoint()
     if (near && (!nearGather || Phaser.Math.Distance.Between(this.player.x, this.player.y, near.sprite.x, near.sprite.y) <= nearGather.dist)) {
       const heldLiked = npcLikesFor(near.id).find((it) => (getPlayer().inventory[it] ?? 0) > 0)
-      this.prompt.setPosition(near.sprite.x, near.sprite.y - TILE).setVisible(true).setText(heldLiked ? '[E] 交谈 · [G] 赠礼' : '[E] 交谈')
+      const probe = npcProbeFor(near.id) || npcScheduleFor(near.id)
+      this.prompt
+        .setPosition(near.sprite.x, near.sprite.y - TILE)
+        .setVisible(true)
+        .setText(probe ? (heldLiked ? '[E] 交谈 · [H] 打探 · [G] 赠礼' : '[E] 交谈 · [H] 打探') : heldLiked ? '[E] 交谈 · [G] 赠礼' : '[E] 交谈')
       if (Phaser.Input.Keyboard.JustDown(this.interactKey)) this.tryInteract()
+      if (Phaser.Input.Keyboard.JustDown(this.probeKey) && probe) this.tryProbe()
       if (heldLiked && Phaser.Input.Keyboard.JustDown(this.giftKey)) this.tryGift()
     } else if (nearGather && nearGather.available) {
       this.prompt
@@ -1356,6 +1379,9 @@ export class WorldScene extends Phaser.Scene {
         reputation: getReputation(),
         // 2.0 寿元（V1.5）：大境界硬锁/此世终结随世界快照入档（推进由世界历驱动，无需存年龄）
         aging: getAging(),
+        // 2.0 NPC 生命周期（V2.2）：NPC 修炼进度 + 坐化登记随世界快照入档（once 防重复）
+        npcs: this.npcLife,
+        npcPassed: [...this.npcPassed],
       },
     }
   }
@@ -1386,11 +1412,12 @@ export class WorldScene extends Phaser.Scene {
     bus.emit('dialogue:open', { npcId: near.id })
   }
 
-  /** V2.1 恩仇·送礼：背包中该 NPC 收礼清单首件可赠物 → 好感写回 + 消耗一件（寄托 G 键，不耗时） */
+  /** V2.1 恩仇·送礼：背包中该 NPC 收礼清单首件可赠物 → 好感写回 + 消耗一件（寄托 G 键，不耗时）；坐化者不再收礼 */
   private tryGift(): void {
     if (this.transitioning || this.battleActive || this.dialogueOpen) return
     const near = this.nearestNpc()
     if (!near) return
+    if (this.npcPassed.includes(near.id)) return
     const held = npcLikesFor(near.id).find((it) => (getPlayer().inventory[it] ?? 0) > 0)
     if (!held) return
     const today = getWorldTime().day
@@ -1405,5 +1432,68 @@ export class WorldScene extends Phaser.Scene {
         : `再赠${name}「${resolveName('item', held)}」，近日受惠已多，只记薄情 +${GIFT_AFFINITY_REPEAT}`,
       kind: 'info',
     })
+  }
+
+  /** V2.2 打探情报文：NPC 具自定义 probe 用之，否则用日程概括兜底（钟表逻辑可被人识破） */
+  private probeTextFor(npcId: string): string {
+    const custom = npcProbeFor(npcId)
+    if (custom) return custom
+    const name = resolveName('npc', npcId)
+    return `（你旁敲侧击${name}的行踪——${scheduleSummary(npcScheduleFor(npcId))}）`
+  }
+
+  /** V2.2 洞察：修炼层数（含世界历演进）+ 坐化大限年；无生命周期返回 null */
+  private insightFor(npcId: string): { realm: string; level: number; base: number; cap: number; lifespanYear: number; bornYear: number } | null {
+    const cult = npcCultivateFor(npcId)
+    if (!cult) return null
+    const bornDay = this.npcLife[npcId]?.bornDay ?? 1
+    const bornYear = Math.ceil(bornDay / DAYS_PER_YEAR)
+    return {
+      realm: cult.realm,
+      level: this.npcLife[npcId]?.level ?? cult.level,
+      base: cult.level,
+      cap: cult.cap,
+      lifespanYear: lifespanYearOf(cult, 1),
+      bornYear,
+    }
+  }
+
+  /** V2.2 打探：H 键 → 情报弹字（日程/修为/寿元大限），无需时辰成本；坐化者不可再询 */
+  private tryProbe(): void {
+    if (this.transitioning || this.battleActive || this.dialogueOpen) return
+    const near = this.nearestNpc()
+    if (!near) return
+    if (this.npcPassed.includes(near.id)) {
+      bus.emit('quest:notify', { text: `${resolveName('npc', near.id)}已坐化，只余故人追忆。`, kind: 'info' })
+      return
+    }
+    const text = this.probeTextFor(near.id)
+    const cult = npcCultivateFor(near.id)
+    const insight = cult ? this.insightFor(near.id) : null
+    const suffix = insight ? ` · 现为${insight.realm}${insight.level}层，寿元大限约在第${insight.lifespanYear}年` : ''
+    bus.emit('quest:notify', { text: `${text}${suffix}`, kind: 'info' })
+  }
+
+  /** V2.2 NPC 生命周期：约每时辰推进一次——世界级（全局 NPC）修炼演进 + 寿元大限坐化（once，剧情锚免疫） */
+  private runNpcLifeTicks(): void {
+    const day = getWorldTime().day
+    for (const id of npcCultivateIds()) {
+      const cult = npcCultivateFor(id)!
+      if (this.npcPassed.includes(id)) continue
+      const bornDay = this.npcLife[id]?.bornDay ?? 1
+      this.npcLife[id] = { bornDay, level: cultivateLevelOnDay(cult, bornDay, day) }
+      if (!passedAwayOnDay(cult, bornDay, day)) continue
+      this.npcPassed.push(id)
+      const name = resolveName('npc', id)
+      const affinity = relationOf(this.relations, id).affinity ?? 0
+      bus.emit('quest:notify', {
+        text:
+          affinity >= 30
+            ? `${name}寿元已尽，于第${Math.ceil(day / DAYS_PER_YEAR)}年安然坐化——你曾善待于他，闭目时嘴角含笑。`
+            : `${name}寿元已尽，于第${Math.ceil(day / DAYS_PER_YEAR)}年悄然坐化，无人知晓。`,
+        kind: 'info',
+      })
+      void writeSave(this.snapshotSave(), AUTO_SLOT)
+    }
   }
 }

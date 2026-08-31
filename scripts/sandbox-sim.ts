@@ -6,6 +6,7 @@
  */
 import {
   SHICHEN_PER_DAY,
+  DAYS_PER_YEAR,
   advanceTime,
   createWorldTime,
   fromWorldSnapshot,
@@ -16,6 +17,7 @@ import {
   yearOf,
   type WorldTimeData,
 } from '../src/systems/time'
+import { cultivateLevelOnDay, lifespanYearOf, passedAwayOnDay, scheduleSummary, type NpcCultivateCfg } from '../src/systems/npclife'
 import {
   createGatherWorldState,
   gatherAt,
@@ -626,6 +628,27 @@ setReputation(0)
 
   const ctxShiqie = { day: 30, lastWorkDay: 22, relations: bumpRelation(createNpcRelationsState(), 'zhang_er', { grudge: 3 }) }
   check('·V2.1 失窃族兼容（旷工8+记恨3）', eventTriggered(zayiyuanShiqieJson as unknown as WorldEvent, ctxShiqie), '')
+}
+
+// ============ V2.2 NPC 生命周期（§6.2）：修炼演进 / 寿元大限 / 日程打探概括 ============
+{
+  const cult: NpcCultivateCfg = { realm: '炼气', level: 3, cap: 6, lifespanYears: 80, growthYears: 4 }
+  const dayPerYear = DAYS_PER_YEAR
+  check('·V2.2 开局即当年修为（Born 第 1 日）', cultivateLevelOnDay(cult, 1, 1) === 3, `lv=${cultivateLevelOnDay(cult, 1, 1)}`)
+  check('·V2.2 每 4 世界年升 1 层（封顶 6）', cultivateLevelOnDay(cult, 1, 1 + 4 * dayPerYear) === 4 && cultivateLevelOnDay(cult, 1, 1 + 8 * dayPerYear) === 5, '')
+  check('·V2.2 未满一轮不升级（第 3 年不满 4）', cultivateLevelOnDay(cult, 1, 1 + 3 * dayPerYear) === 3, '')
+  check('·V2.2 封顶后不再升', cultivateLevelOnDay(cult, 1, 1 + 20 * dayPerYear) === 6, '')
+  check('·V2.2 寿元大限第 80 年年初坐化', passedAwayOnDay(cult, 1, 79 * dayPerYear) === false && passedAwayOnDay(cult, 1, 80 * dayPerYear - 1) === true, '')
+  check('·V2.2 大限年份映射', lifespanYearOf(cult, 1) === 80, `year=${lifespanYearOf(cult, 1)}`)
+  check(
+    '·V2.2 日程打探概括（连续时辰合并/多段逗留分段）',
+    scheduleSummary({
+      子: [6, 16], 丑: [6, 16], 寅: [6, 16], 卯: [22, 4], 辰: [22, 4], 巳: [22, 4],
+      午: [6, 16], 未: [6, 16],
+    }) === '子~寅/午~未在 (6,16)；卯~巳在 (22,4)',
+    `got=${scheduleSummary({ 子: [6, 16], 丑: [6, 16], 寅: [6, 16], 卯: [22, 4], 辰: [22, 4], 巳: [22, 4], 午: [6, 16], 未: [6, 16] })}`,
+  )
+  check('·V2.2 静态 NPC 打探兜底文案', scheduleSummary(undefined) === '行踪不定，常驻故地', '')
 }
 
 console.log(`\nSANDBOX-SIM: ${passed} 项通过, ${failed} 项失败`)

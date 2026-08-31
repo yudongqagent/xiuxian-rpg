@@ -92,6 +92,23 @@ export const NpcSchema = z.object({
   watchRadius: z.number().int().min(1).max(12).optional(),
   /** 收礼清单（V2.1 恩仇·送礼）：itemId 列表；玩家持有其一并走进 NPC 即可按 G 赠出（validate 校验存在性） */
   likes: z.array(z.string().regex(/^[a-z0-9_]+$/)).min(1).optional(),
+  /** 打探文案（V2.2）：按 H 询问此 NPC 时弹出的情报；缺省自动概括其日程（攻守：日程在实战里可被打探） */
+  probe: z.string().min(1).max(120).optional(),
+  /** 世界级生命周期（V2.2，REDESIGN §6.2）：NPC 亦修真——随世界历修炼、至寿元大限坐化；缺省 = 剧情锚/不朽 NPC（免疫死亡，§6.1） */
+  cultivate: z
+    .object({
+      /** 境界名（展示用，如 炼气/筑基/结丹） */
+      realm: z.string().min(1).max(8),
+      /** 开局修炼层数（1 起） */
+      level: z.number().int().min(1).max(99),
+      /** 修炼上限层数（到顶后停徒修为） */
+      cap: z.number().int().min(1).max(99),
+      /** 寿元大限（世界年）：自游戏第 1 日计，届满即坐化 */
+      lifespanYears: z.number().int().min(40).max(5000),
+      /** 每升 1 层所需世界年（缺省 5） */
+      growthYears: z.number().int().min(1).max(99).optional(),
+    })
+    .optional(),
 })
 
 export const RegionSchema = z.object({

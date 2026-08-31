@@ -21,15 +21,27 @@ declare global {
         navDirect: (tx: number, ty: number) => void
         npcs: () => Array<{ id: string; x: number; y: number }>
         relations: () => Record<string, unknown>
-        'relations.bump': (npcId: string, delta: { affine?: number; grudge?: number }) => void
+        'relations.bump': (npcId: string, delta: { affinity?: number; affine?: number; grudge?: number }) => void
         world: () => {
           events: string[]
           labor: { lastWorkDay?: number }
           reputation: number
           absentDays: number
           aging: { lockedRealms: string[]; ended: boolean }
+          npcPassed: string[]
           _now: unknown
         }
+        'npc.probe': (npcId: string) => string
+        'npc.insight': (npcId: string) =>
+          | {
+              realm: string
+              level: number
+              base: number
+              cap: number
+              lifespanYear: number
+              bornYear: number
+            }
+          | null
         'rng.force': (v: number | null) => void
         'realm.set': (level: number) => void
         flags: () => { dialogueOpen: boolean; battleActive: boolean; transitioning: boolean }

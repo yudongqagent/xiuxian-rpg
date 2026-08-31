@@ -145,6 +145,30 @@ const lsBao1 = await page.evaluate(() => {
 })
 note(`「张二报恩」应验：${(baoToast ?? '').trim().slice(0, 34)} · 好感 ${a2}=>${relBao?.zhang_er?.affinity ?? '-'} · 灵石 ${lsBao0}→${lsBao1}`)
 
+// —— 观察主线三：NPC 也是会老的修真者（V2.2 生命周期） ——
+// 打探：张二的日程表本质可被识破（卯~巳在药园盯梢）；陈巧倩的自白情报
+const probeZhang = await page.evaluate(() => window.__xiuxian?.scene['npc.probe']?.('zhang_er') ?? '')
+const probeChen = await page.evaluate(() => window.__xiuxian?.scene['npc.probe']?.('chen_qiaoqian') ?? '')
+note(`打探张二：${probeZhang}`)
+note(`打探陈巧倩：${probeChen.slice(0, 30)}...`)
+// 洞察：凡躯茶翁 60 载大限 / 结丹李化元 400 载大限；青纹随世界历修炼（3→6 层封顶）
+const insTea = await page.evaluate(() => window.__xiuxian?.scene['npc.insight']?.('chaopeng_laoren'))
+const insLi = await page.evaluate(() => window.__xiuxian?.scene['npc.insight']?.('li_huayuan'))
+const y1 = await page.evaluate(() => window.__xiuxian?.scene['npc.insight']?.('qing_wen')?.level)
+await page.evaluate(() => window.__xiuxian?.scene.time.set(30 * 60 + 1, 0))
+const y30 = await page.evaluate(() => window.__xiuxian?.scene['npc.insight']?.('qing_wen')?.level)
+note(`洞察：茶翁 凡躯·寿限 第${insTea?.lifespanYear}年；李化元 结丹·寿限 第${insLi?.lifespanYear}年`)
+note(`世界历演进：青纹 第1载 ${y1} 层 → 第30载 ${y30} 层（炼气封顶，NPC 亦修真）`)
+// 坐化现场：茶翁第 60 载寿尽 —— 真实 HUD 流字 + once 入档；剧情锚张二不受寿元影响
+await page.evaluate(() => window.__xiuxian?.scene.time.set(59 * 60 + 1, 0))
+await page.waitForTimeout(900)
+const zustand = await page.evaluate(() => (window.__xiuxian?.scene.world?.()?.npcPassed ?? []).includes('chaopeng_laoren'))
+const fallToast = await page.locator('.toast', { hasText: /坐化/ }).last().textContent().catch(() => '')
+note(`坐化：${(fallToast ?? '').trim().slice(0, 40)}（劫后 ${zustand ? '已入档 once' : '未入档'}）`)
+const probeZhe2 = await page.evaluate(() => window.__xiuxian?.scene['npc.insight']?.('zhang_er') ?? 'null')
+note(`张二（剧情锚）洞察：${probeZhe2}（免疫死亡）`)
+await page.evaluate(() => window.__xiuxian?.scene.time.set(2801, 0))
+
 // —— 收尾：突破失败 → 寿元不足半寿 → 大境界硬锁（承接 V1.5） ——
 await page.evaluate(() => window.__xiuxian?.scene['realm.set']?.(13))
 await page.evaluate(() => window.__xiuxian?.scene.time.set(3661, 0))
@@ -159,7 +183,7 @@ await page.waitForTimeout(500)
 const dreadful = (await page.locator('.dreadful').textContent().catch(() => '')).trim()
 note(`突破失败收尾：${dreadful.slice(0, 46)}`)
 
-const ok = g1 > g0 && g1 >= 1 && g2 === g1 && (a1 === a0 + 8 && a2 === a1 + 1) && /灵石十二枚/.test(baoToast ?? '') && relBao?.zhang_er?.affinity === 10 && /寿元剩余 37 年无望筑基/.test(dreadful)
+const ok = g1 > g0 && g1 >= 1 && g2 === g1 && (a1 === a0 + 8 && a2 === a1 + 1) && /灵石十二枚/.test(baoToast ?? '') && relBao?.zhang_er?.affinity === 10 && /寿元剩余 37 年无望筑基/.test(dreadful) && /卯~巳在 \(22,4\)/.test(probeZhang) && /练剑百遍/.test(probeChen) && y1 === 3 && y30 === 6 && insTea?.lifespanYear === 60 && insLi?.lifespanYear === 400 && zustand && /坐化/.test(fallToast ?? '') && probeZhe2 === 'null'
 console.log(`\n【试玩具体观察一】张二的盯梢因果随时辰表切换：${g1 > g0 && g2 === g1 ? '成立' : '未断言成功'}`)
 console.log(`  ① 辰时偷摘被目击：记恨 ${g0}→${g1}`)
 console.log(`  ② 午时偷摘无人知：记恨 ${g1}→${g2}`)
@@ -167,6 +191,10 @@ console.log(`【试玩具体观察二】善缘与药园经济互相排挤（V2.1
 console.log(`  ③ 首礼好感 +8（${a0}→${a1}），旬内再送只 +${a2 - a1}——送礼花灵草、卖草换灵石，两条路二选一`)
 console.log(`  ④ 好感攒满 40 → 「张二报恩」赠灵石 12，情债了结（灵石 ${lsBao0}→${lsBao1}，好感 ${a2}→${relBao?.zhang_er?.affinity ?? '-'}）`)
 console.log(`  ⑤ 突破失败收尾：${dreadful.slice(0, 46)}`)
+console.log(`【试玩具体观察三】NPC 也是会老的修真者（V2.2 生命周期）：${/卯~巳在 \(22,4\)/.test(probeZhang) && y1 === 3 && y30 === 6 && zustand && /坐化/.test(fallToast ?? '') ? '成立' : '未断言成功'}`)
+console.log(`  ⑥ 打探识破钟表：张二卯~巳守药园(${/22,4/.test(probeZhang) ? '22,4' : '?'}) —— 目击规则可被玩家读出、预判并绕开`)
+console.log(`  ⑦ 世界历演进：青纹 第1载 ${y1} 层 → 第30载 ${y30} 层（封顶）；李化元结丹寿限 第${insLi?.lifespanYear} 年`)
+console.log(`  ⑧ 掸灰人终成灰：茶翁第${insTea?.lifespanYear}载坐化${zustand ? ' 已入档' : ' 未入档'} —— 世界记得，剧情锚张二不朽`)
 console.log(`总览（真实游玩体验采集于 preview）：
 ${LOG.map((l) => '  ' + l).join('\n')}`)
 

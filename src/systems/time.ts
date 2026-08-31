@@ -39,6 +39,10 @@ export interface WorldSnapshot {
   reputation?: number
   /** 寿元（V1.5）：大境界硬锁/此世终结；推进由世界历驱动，无需存年龄 */
   aging?: { lockedRealms?: string[]; ended?: boolean }
+  /** NPC 世界级生命周期（V2.2）：npcId → 出生日/当前修炼层数；世界历推进即修炼 */
+  npcs?: Record<string, { bornDay: number; level: number }>
+  /** NPC 坐化登记（V2.2）：已陨落 NPC（once 防重复，重载不重播） */
+  npcPassed?: string[]
   // V2 扩：eventQueue / regionStates / seenHints / fog
 }
 

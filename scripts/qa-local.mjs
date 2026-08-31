@@ -681,6 +681,47 @@ try {
       `Δ灵石=${deltaChou} Δ风评=${repDrop} grudge=${relChou.zhang_er?.grudge} type=${relChou.zhang_er?.type}`)
   }
 
+  // 8.98 生命周期（V2.2）：打探日程/修为情报 + 世界级修炼演进 + 寿元大限坐化（剧情锚免疫）
+  {
+    await closeBattle()
+    const probeTea = await page.evaluate(() => window.__xiuxian?.scene['npc.probe']?.('chaopeng_laoren') ?? '')
+    const probeZhang = await page.evaluate(() => window.__xiuxian?.scene['npc.probe']?.('zhang_er') ?? '')
+    const probeQing = await page.evaluate(() => window.__xiuxian?.scene['npc.probe']?.('chen_qiaoqian') ?? '')
+    add('打探·茶棚老翁自定义情报', /四十载/.test(probeTea), `probe=${probeTea.slice(0, 24)}`)
+    add('打探·张二日程概括（钟表可被识破）', /卯~巳/.test(probeZhang) && /22,4/.test(probeZhang), `probe=${probeZhang}`)
+    add('打探·陈巧倩练剑情报', /练剑百遍/.test(probeQing), `probe=${probeQing.slice(0, 16)}`)
+    // 洞察：境界/基础层数/寿命大限年
+    const insTea = await page.evaluate(() => window.__xiuxian?.scene['npc.insight']?.('chaopeng_laoren'))
+    const insLi = await page.evaluate(() => window.__xiuxian?.scene['npc.insight']?.('li_huayuan'))
+    const insZhe = await page.evaluate(() => window.__xiuxian?.scene['npc.insight']?.('zhang_er'))
+    add('洞察·凡躯茶翁（60年大限）', insTea?.realm === '凡躯' && insTea.base === 1 && insTea.cap === 1 && insTea.lifespanYear === 60,
+      `realm=${insTea?.realm} cap=${insTea?.cap} year=${insTea?.lifespanYear}`)
+    add('洞察·结丹长老（400年大限）', insLi?.realm === '结丹' && insLi.base === 17 && insLi.cap === 21 && insLi.lifespanYear === 400,
+      `realm=${insLi?.realm} base=${insLi?.base} year=${insLi?.lifespanYear}`)
+    add('洞察·剧情锚无生命周期（免疫死亡）', insZhe === null, `ins=${JSON.stringify(insZhe)}`)
+    // 世界级修炼演进：青纹 每4世界年+1层，封顶6 —— 第30载应与第1载不同
+    await page.evaluate(() => window.__xiuxian?.scene.time.set(1, 0))
+    const lvYear1 = await page.evaluate(() => window.__xiuxian?.scene['npc.insight']?.('qing_wen')?.level)
+    await page.evaluate(() => window.__xiuxian?.scene.time.set(30 * 60 + 1, 0))
+    const lvYear30 = await page.evaluate(() => window.__xiuxian?.scene['npc.insight']?.('qing_wen')?.level)
+    add('修炼·世界历演进（青纹 3层→第30载封顶6）', lvYear1 === 3 && lvYear30 === 6, `y1=${lvYear1} y30=${lvYear30}`)
+    // 寿元大限：茶棚老翁第60载坐化（世界级，无需到访）→ once 入档；剧情锚（张二）不受寿元影响
+    await page.evaluate(() => window.__xiuxian?.scene.time.set(59 * 60 + 1, 0))
+    let passedTea = false
+    for (let i = 0; i < 6 && !passedTea; i++) {
+      await page.waitForTimeout(350)
+      const w = await page.evaluate(() => window.__xiuxian?.scene.world?.())
+      passedTea = !!w?.npcPassed?.includes('chaopeng_laoren')
+      void i
+    }
+    const insAfter = await page.evaluate(() => window.__xiuxian?.scene['npc.insight']?.('chaopeng_laoren'))
+    add('坐化·茶翁第60载坐化（once 入档）', passedTea, `passed=${passedTea}`)
+    add('坐化·坐化后不再演进（等级冻结）', insAfter?.level === 1 && insAfter?.realm === '凡躯', `lv=${insAfter?.level}`)
+    add('坐化·不可复唤（剧情锚张二无坐化）', (await page.evaluate(() => window.__xiuxian?.scene.world?.()?.npcPassed ?? [])).every((id) => id !== 'zhang_er'), '')
+    // 退出大限，回到常态世界日（供 8.94 终结场景独立驱动）
+    await page.evaluate(() => window.__xiuxian?.scene.time.set(2801, 0))
+  }
+
   // 8.94 寿元（V1.5）：寿元耗尽即此世终结（结局·寿数尽）——世界时钟冻结，终局可入档
   {
     await closeBattle()
